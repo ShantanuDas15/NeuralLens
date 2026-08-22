@@ -119,11 +119,12 @@ def _register_routers(application: FastAPI) -> None:
     """Register all API routers onto the application."""
 
     try:
-        from routers import enhance, history, profile  # noqa: PLC0415
+        from routers import enhance, history, profile, results  # noqa: PLC0415
 
         application.include_router(enhance.router, prefix="/api", tags=["enhance"])
         application.include_router(history.router, prefix="/api", tags=["history"])
         application.include_router(profile.router, prefix="/api", tags=["profile"])
+        application.include_router(results.router, prefix="/api", tags=["results"])
         logger.info("All API routers registered.")
     except ImportError as exc:
         logger.warning(
