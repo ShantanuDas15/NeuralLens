@@ -5,19 +5,10 @@ Tests the image enhancement pipeline using mock inference to avoid GPU requireme
 
 from __future__ import annotations
 
-import sys
-from unittest.mock import MagicMock
-
-# Mock torch, basicsr and realesrgan before importing services.srgan
-sys.modules["torch"] = MagicMock()
-sys.modules["basicsr"] = MagicMock()
-sys.modules["basicsr.archs"] = MagicMock()
-sys.modules["basicsr.archs.rrdbnet_arch"] = MagicMock()
-sys.modules["realesrgan"] = MagicMock()
-
 import os
+import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

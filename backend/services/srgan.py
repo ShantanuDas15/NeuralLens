@@ -10,10 +10,19 @@ from __future__ import annotations
 
 import logging
 import os
+
+# Patch for basicsr compatibility with newer torchvision versions
+import sys
 import time
 from typing import Any
 
 import torch
+import torchvision
+
+sys.modules["torchvision.transforms.functional_tensor"] = (
+    torchvision.transforms.functional
+)
+
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 
