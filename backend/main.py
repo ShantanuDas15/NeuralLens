@@ -14,19 +14,38 @@ import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from config import settings
+from middleware.rate_limit import limiter
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    level=logging.DEBUG if settings.debug else logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.stdlib.BoundLogger,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
 )
-logger = logging.getLogger(__name__)
+
+# Replace the default logger with structlog
+logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +108,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Construct and configure the FastAPI application instance."""
 
+    from middleware.logging import StructlogMiddleware  # noqa: PLC0415
+
     application = FastAPI(
         title="NeuralLens API",
         description="AI-Powered Image Super-Resolution — Backend API",
@@ -97,6 +118,19 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    application.state.limiter = limiter
+    application.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    @application.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        logger.error("Unhandled exception", exc_info=exc)
+        return JSONResponse(
+            status_code=500, content={"detail": "Internal Server Error"}
+        )
+
+    # Middleware (Order matters: outermost first)
+    application.add_middleware(StructlogMiddleware)
 
     # CORS
     application.add_middleware(

@@ -45,6 +45,9 @@ def _make_engine():
             from sqlalchemy.pool import StaticPool
 
             kwargs["poolclass"] = StaticPool
+    elif "postgresql" in settings.database_url:
+        kwargs["pool_size"] = 10
+        kwargs["max_overflow"] = 20
 
     kwargs["connect_args"] = connect_args
 
@@ -87,11 +90,16 @@ async def init_db() -> None:
     """
     from sqlalchemy import select  # noqa: PLC0415
 
+    from config import settings  # noqa: PLC0415
     from models.database import Base, ModelConfig  # noqa: PLC0415
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("All database tables created (or already exist).")
+    # Base.metadata.create_all is no longer used for postgresql table creation
+    # We now use Alembic migrations (e.g., `alembic upgrade head`).
+    # However, tests use an in-memory SQLite database and still rely on create_all.
+    if "sqlite" in settings.database_url:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("All SQLite database tables created (or already exist).")
 
     # Seed the default Real-ESRGAN model config
     async with AsyncSessionLocal() as session:

@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from firebase_admin import auth as firebase_auth
 from firebase_admin.auth import InvalidIdTokenError, RevokedIdTokenError
 from sqlalchemy import select
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
+    request: Request,
     authorization: Annotated[str, Header()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
@@ -108,4 +109,5 @@ async def get_current_user(
 
     # The session is committed automatically by the `get_db` dependency's yield block
     # so we just return the user object here.
+    request.state.user = user
     return user

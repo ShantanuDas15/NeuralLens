@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from db.session import get_db
 from middleware.auth import get_current_user
+from middleware.rate_limit import limiter
 from models.database import AuditLog, EnhancementJob, User, UserUsageStats
 from schemas.enhance import EnhancementJobResponse
 from services.srgan import enhance_image
@@ -22,6 +23,9 @@ from services.srgan import enhance_image
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/enhance", tags=["enhance"])
+
+# Max concurrent inferences (prevents OOM on GPU/CPU)
+inference_semaphore = asyncio.Semaphore(1)
 
 
 def _get_extension(filename: str | None) -> str:
@@ -34,7 +38,9 @@ def _get_extension(filename: str | None) -> str:
 
 
 @router.post("", response_model=EnhancementJobResponse)
+@limiter.limit("5/minute")
 async def create_enhancement_job(
+    request: Request,
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -117,8 +123,9 @@ async def create_enhancement_job(
 
     # 6. Run enhancement (in a threadpool since it's CPU/GPU bound and blocking)
     try:
-        # Run blocking inference in a separate thread so we don't block the async event loop
-        result_bytes, metadata = await asyncio.to_thread(enhance_image, input_bytes)
+        # Run blocking inference in a separate thread bounded by a semaphore
+        async with inference_semaphore:
+            result_bytes, metadata = await asyncio.to_thread(enhance_image, input_bytes)
     except Exception as exc:
         logger.error("Inference failed for job %s: %s", job_id, exc)
         job.status = "failed"
