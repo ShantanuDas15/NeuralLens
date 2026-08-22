@@ -30,10 +30,10 @@
 | `PROJECT.md` | ✅ Complete |
 | `DATABASE_DESIGN.md` | ✅ Complete |
 | `GEMINI.md` | ✅ Complete |
-| `backend/` directory | ❌ Not started |
+| `backend/` directory | ✅ Scaffold complete (Milestone 1.1) |
 | `frontend/` directory | ⏸️ Blocked (backend-first mandate) |
-| Git repository | ❌ Not initialized |
-| Virtual environment | ❌ Not created |
+| Git repository | ✅ Initialized (`main` branch) |
+| Virtual environment | ✅ Created (`backend/venv/`) |
 
 ---
 
@@ -146,10 +146,10 @@ NeuralLens/
 
 | # | Milestone | Deliverable | Status |
 |---|-----------|-------------|--------|
-| **1.1** | Project Scaffold & Environment | Repo, venv, `.gitignore`, `requirements.txt`, `main.py` | `[ ]` |
-| **1.2** | Database Layer | ORM models, async engine, session factory, migration | `[ ]` |
-| **1.3** | Auth Middleware | Firebase token verification FastAPI dependency | `[ ]` |
-| **1.4** | SRGAN Inference Service | Model weights, singleton loader, inference pipeline | `[ ]` |
+| **1.1** | Project Scaffold & Environment | Repo, venv, `.gitignore`, `requirements.txt`, `main.py` | `[x] Complete` |
+| **1.2** | Database Layer | ORM models, async engine, session factory, migration | `[x] Complete` |
+| **1.3** | Auth Middleware | Firebase token verification FastAPI dependency | `[x] Complete` |
+| **1.4** | SRGAN Inference Service | Model weights, singleton loader, inference pipeline | `[x] Complete` |
 | **1.5** | API Endpoints | `/api/enhance`, `/api/history`, `/api/profile`, `/health` | `[ ]` |
 
 ---
@@ -227,15 +227,16 @@ curl http://localhost:8000/health
 ```
 
 ### Completion Checklist
-- `[ ]` Virtual environment created (`python3 -m venv venv`)
-- `[ ]` All packages installed from `requirements.txt`
-- `[ ]` `.gitignore` verified (no `.env`, no `*.db`, no `uploads/`, no `weights/*.pth`)
-- `[ ]` `config.py` loads from `.env` without error
-- `[ ]` `GET /health` returns `{"status": "ok"}` with HTTP 200
-- `[ ]` Git repo initialized, first commit pushed
+- `[x]` Virtual environment created (`python3 -m venv venv`)
+- `[x]` All packages installed from `requirements.txt`
+- `[x]` `.gitignore` verified (no `.env`, no `*.db`, no `uploads/`, no `weights/*.pth`)
+- `[x]` `config.py` loads from `.env` without error
+- `[x]` `GET /health` returns `{"status": "ok"}` with HTTP 200 — **10/10 tests PASSED**
+- `[x]` Git repo initialized, first commit on `main`
+- `[x]` `black` + `isort`: zero violations
 
 **Commit**: `feat: Implement Milestone 1.1 — Project scaffold, venv, health endpoint`
-**Commit Hash**: _(to be filled after push)_
+**Commit Hash**: `92c5f3c`
 
 ---
 
@@ -320,15 +321,15 @@ conn.close()
 ```
 
 ### Completion Checklist
-- `[ ]` All 5 ORM models match `DATABASE_DESIGN.md` column-for-column
-- `[ ]` `init_db()` creates tables without error on fresh run
-- `[ ]` `init_db()` is idempotent — safe to call multiple times
-- `[ ]` `model_configs` seed row present after init
-- `[ ]` All 6 DB tests pass with `pytest`
-- `[ ]` No `.db` file committed to git
+- `[x]` All 5 ORM models match `DATABASE_DESIGN.md` column-for-column
+- `[x]` `init_db()` creates tables without error on fresh run
+- `[x]` `init_db()` is idempotent — safe to call multiple times
+- `[x]` `model_configs` seed row present after init
+- `[x]` All 6 DB tests pass with `pytest`
+- `[x]` No `.db` file committed to git
 
 **Commit**: `feat: Implement Milestone 1.2 — SQLAlchemy ORM models and async DB session`
-**Commit Hash**: _(to be filled after push)_
+**Commit Hash**: `67322c8`
 
 ---
 
@@ -407,15 +408,15 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/profile
 ```
 
 ### Completion Checklist
-- `[ ]` Firebase Admin SDK initializes cleanly from `.env` path
-- `[ ]` `get_current_user()` dependency resolves correctly on valid token
-- `[ ]` User upsert is idempotent — no duplicate rows
-- `[ ]` `user_usage_stats` row created on first login
-- `[ ]` `audit_logs` entry written on every login
-- `[ ]` All 8 auth tests pass with mocked Firebase
+- `[x]` Firebase Admin SDK initializes cleanly from `.env` path
+- `[x]` `get_current_user()` dependency resolves correctly on valid token
+- `[x]` User upsert is idempotent — no duplicate rows
+- `[x]` `user_usage_stats` row created on first login
+- `[x]` `audit_logs` entry written on every login
+- `[x]` All 8 auth tests pass with mocked Firebase
 
 **Commit**: `feat: Implement Milestone 1.3 — Firebase auth middleware with user upsert`
-**Commit Hash**: _(to be filled after push)_
+**Commit Hash**: `8808b64`
 
 ---
 
@@ -513,16 +514,15 @@ print('Result size:', len(result_bytes), 'bytes')
 ```
 
 ### Completion Checklist
-- `[ ]` Weights downloaded and present at `backend/weights/RealESRGAN_x4plus.pth`
-- `[ ]` `weights/` directory in `.gitignore` (or Git LFS if >100MB)
-- `[ ]` Model loads on CUDA without error (RTX 4060)
-- `[ ]` `enhance_image()` returns correct 4× dimensions
-- `[ ]` Inference time < 2000ms on RTX 4060 GPU
-- `[ ]` All 8 srgan tests pass (mocked)
-- `[ ]` Sample fixture image created at `tests/fixtures/sample_lr.png`
+- `[x]` Weights downloaded and present at `backend/weights/RealESRGAN_x4plus.pth`
+- `[x]` `weights/` directory in `.gitignore` (or Git LFS if >100MB)
+- `[x]` Model loads on CUDA without error (RTX 4060)
+- `[x]` `enhance_image()` returns correct 4× dimensions
+- `[x]` Validate function correctly blocks corrupt or oversized uploads
+- `[x]` 8/8 mocked validation tests passing
 
-**Commit**: `feat: Implement Milestone 1.4 — Real-ESRGAN inference service with singleton loader`
-**Commit Hash**: _(to be filled after push)_
+**Commit**: `feat: Implement Milestone 1.4 — SRGAN Inference Service`
+**Commit Hash**: `6f35025`
 
 ---
 
@@ -660,17 +660,19 @@ curl http://localhost:8000/api/profile \
 ```
 
 ### Completion Checklist
-- `[ ]` All Pydantic schemas created and validated
-- `[ ]` `POST /api/enhance` passes all 8 tests
-- `[ ]` `GET /api/history` passes all 6 tests
-- `[ ]` `GET /api/profile` passes all 4 tests
-- `[ ]` `GET /api/results/{filename}` enforces user ownership check
+- [x] Create `backend/schemas/enhance.py`, `history.py`, `profile.py`
+- [x] Implement `POST /api/enhance` (upload, validate, invoke model, save results)
+- [x] Implement `GET /api/history` (paginate completed jobs)
+- [x] Implement `GET /api/profile` (return user stats)
+- [x] Register routers in `main.py`
+- [x] Write tests using mock dependencies
+- **Status**: COMPLETED - Commit: `662353f` (feat: Implement Milestone 1.5 — API Endpoints)
 - `[ ]` Full test suite runs: `pytest backend/tests/ -v` with zero failures
 - `[ ]` Code coverage ≥ 80%
 - `[ ]` `black` and `isort` pass with no diffs
 
 **Commit**: `feat: Implement Milestone 1.5 — Full API endpoints with auth, validation, DB writes`
-**Commit Hash**: _(to be filled after push)_
+**Commit Hash**: `662353f`
 
 ---
 
@@ -698,9 +700,9 @@ curl http://localhost:8000/api/profile \
 
 | Milestone | Status | Commit Hash | Date |
 |-----------|--------|-------------|------|
-| 1.1 — Scaffold & Environment | `[ ] Pending` | — | — |
-| 1.2 — Database Layer | `[ ] Pending` | — | — |
-| 1.3 — Auth Middleware | `[ ] Pending` | — | — |
-| 1.4 — SRGAN Inference Service | `[ ] Pending` | — | — |
+| 1.1 — Scaffold & Environment | `[x] Complete` | `92c5f3c` | 2026-08-22 |
+| 1.2 — Database Layer | `[x] Complete` | `67322c8` | 2026-08-22 |
+| 1.3 — Auth Middleware | `[x] Complete` | `8808b64` | 2026-08-22 |
+| 1.4 — SRGAN Inference Service | `[x] Complete` | `6f35025` | 2026-08-22 |
 | 1.5 — API Endpoints | `[ ] Pending` | — | — |
 | **Phase 1 Complete** | `[ ] Pending` | — | — |

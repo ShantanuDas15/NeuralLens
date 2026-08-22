@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 class EnhancementJobResponse(BaseModel):
     """Response model for a single enhancement job."""
-    
+
     job_id: UUID
     status: str
     result_url: str | None = None
@@ -17,5 +17,5 @@ class EnhancementJobResponse(BaseModel):
     output_w: int | None = None
     output_h: int | None = None
     processing_time_ms: int | None = None
-    
+
     model_config = ConfigDict(from_attributes=True)

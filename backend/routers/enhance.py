@@ -63,22 +63,23 @@ async def create_enhancement_job(
 
     # 2.5 Decode to get dimensions
     from services.image_utils import validate_and_decode
+
     try:
         img_arr = validate_and_decode(input_bytes, settings.max_upload_bytes)
         input_h, input_w = img_arr.shape[:2]
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=str(exc)
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
         )
 
     # 3. Create EnhancementJob row (pending)
     job_id = str(uuid4())
     now = datetime.now(timezone.utc)
-    
+
     # Needs a model_config_id. We'll query for the first available RealESRGAN model
     # (Since we seeded it in the migrations, it should exist, or we can just leave it None if nullable, but it's nullable=False)
     from models.database import ModelConfig
+
     model_config_result = await db.execute(select(ModelConfig).limit(1))
     model_config = model_config_result.scalar_one_or_none()
     if not model_config:
@@ -122,14 +123,16 @@ async def create_enhancement_job(
         logger.error("Inference failed for job %s: %s", job_id, exc)
         job.status = "failed"
         job.error_message = str(exc)
-        
+
         # Update failed stats
-        stats_res = await db.execute(select(UserUsageStats).where(UserUsageStats.user_id == current_user.id))
+        stats_res = await db.execute(
+            select(UserUsageStats).where(UserUsageStats.user_id == current_user.id)
+        )
         stats = stats_res.scalar_one()
         stats.total_jobs += 1
         stats.failed_jobs += 1
         stats.last_job_at = datetime.now(timezone.utc)
-        
+
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -156,7 +159,9 @@ async def create_enhancement_job(
     job.processing_time_ms = metadata.get("processing_time_ms")
 
     # 9. Update stats
-    stats_res = await db.execute(select(UserUsageStats).where(UserUsageStats.user_id == current_user.id))
+    stats_res = await db.execute(
+        select(UserUsageStats).where(UserUsageStats.user_id == current_user.id)
+    )
     stats = stats_res.scalar_one()
     stats.total_jobs += 1
     stats.successful_jobs += 1

@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class HistoryItem(BaseModel):
     """Response model for a single item in the history list."""
-    
+
     job_id: UUID
     status: str
     original_filename: str
@@ -21,13 +21,13 @@ class HistoryItem(BaseModel):
     processing_time_ms: int | None = None
     created_at: datetime
     result_url: str | None = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class HistoryPaginatedResponse(BaseModel):
     """Paginated response containing multiple history items."""
-    
+
     items: List[HistoryItem]
     total: int
     page: int

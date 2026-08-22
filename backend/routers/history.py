@@ -23,13 +23,10 @@ async def get_history(
 ):
     """Retrieve the user's completed enhancement jobs with pagination."""
     # Base query for completed and non-deleted jobs for the current user
-    base_query = (
-        select(EnhancementJob)
-        .where(
-            EnhancementJob.user_id == current_user.id,
-            EnhancementJob.status == "completed",
-            EnhancementJob.deleted_at.is_(None),
-        )
+    base_query = select(EnhancementJob).where(
+        EnhancementJob.user_id == current_user.id,
+        EnhancementJob.status == "completed",
+        EnhancementJob.deleted_at.is_(None),
     )
 
     # 1. Get total count
@@ -40,8 +37,7 @@ async def get_history(
     # 2. Get paginated items
     offset = (page - 1) * page_size
     items_query = (
-        base_query
-        .order_by(EnhancementJob.created_at.desc())
+        base_query.order_by(EnhancementJob.created_at.desc())
         .offset(offset)
         .limit(page_size)
     )
@@ -54,19 +50,23 @@ async def get_history(
     # Pydantic doesn't do that by default unless we set aliases, or we can just map it here.
     items = []
     for job in jobs:
-        items.append({
-            "job_id": job.id,
-            "status": job.status,
-            "original_filename": job.original_filename,
-            "input_w": job.input_width,
-            "input_h": job.input_height,
-            "output_w": job.output_width,
-            "output_h": job.output_height,
-            "scale_factor": job.scale_factor,
-            "processing_time_ms": job.processing_time_ms,
-            "created_at": job.created_at,
-            "result_url": f"/api/results/{job.id}.png" if job.status == "completed" else None,
-        })
+        items.append(
+            {
+                "job_id": job.id,
+                "status": job.status,
+                "original_filename": job.original_filename,
+                "input_w": job.input_width,
+                "input_h": job.input_height,
+                "output_w": job.output_width,
+                "output_h": job.output_height,
+                "scale_factor": job.scale_factor,
+                "processing_time_ms": job.processing_time_ms,
+                "created_at": job.created_at,
+                "result_url": (
+                    f"/api/results/{job.id}.png" if job.status == "completed" else None
+                ),
+            }
+        )
 
     return HistoryPaginatedResponse(
         items=items,

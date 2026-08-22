@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class UserStatsModel(BaseModel):
     """Usage statistics embedded inside the user profile."""
-    
+
     total_jobs: int
     successful_jobs: int
     failed_jobs: int
@@ -17,7 +17,7 @@ class UserStatsModel(BaseModel):
 
 class ProfileResponse(BaseModel):
     """Response model for the user profile endpoint."""
-    
+
     uid: str
     email: str
     display_name: Optional[str] = None
@@ -25,5 +25,5 @@ class ProfileResponse(BaseModel):
     auth_provider: str
     member_since: datetime
     stats: UserStatsModel
-    
+
     model_config = ConfigDict(from_attributes=True)

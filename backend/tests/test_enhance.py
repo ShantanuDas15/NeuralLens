@@ -26,10 +26,12 @@ def set_test_env():
     os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
     # Use small limits for testing
     os.environ["MAX_UPLOAD_BYTES"] = "2097152"  # 2MB
-    
+
     # Reload config to apply
-    import config
     import importlib
+
+    import config
+
     importlib.reload(config)
     yield
 
@@ -73,13 +75,16 @@ def mock_enhance_image():
     """Mock the actual SRGAN inference to return dummy bytes."""
     with patch("routers.enhance.enhance_image") as mock:
         # returns (result_bytes, metadata)
-        mock.return_value = (b"fake_png_data", {
-            "input_width": 128,
-            "input_height": 128,
-            "output_width": 512,
-            "output_height": 512,
-            "processing_time_ms": 450,
-        })
+        mock.return_value = (
+            b"fake_png_data",
+            {
+                "input_width": 128,
+                "input_height": 128,
+                "output_width": 512,
+                "output_height": 512,
+                "processing_time_ms": 450,
+            },
+        )
         yield mock
 
 
@@ -87,14 +92,17 @@ def mock_enhance_image():
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_enhance_unauthenticated(client):
     """Test 5: Unauthenticated request (no Bearer header) -> 401."""
     response = client.post(
-        "/api/enhance",
-        files={"file": ("test.png", b"fake", "image/png")}
+        "/api/enhance", files={"file": ("test.png", b"fake", "image/png")}
     )
-    assert response.status_code == 422 # Because of missing Authorization header (422 by FastAPI Header validation)
+    assert (
+        response.status_code == 422
+    )  # Because of missing Authorization header (422 by FastAPI Header validation)
+
 
 def test_malformed_auth(client):
     response = client.post(
@@ -104,12 +112,12 @@ def test_malformed_auth(client):
     )
     assert response.status_code == 401
 
+
 @pytest.mark.asyncio
 async def test_enhance_no_file(client, mock_verify_token):
     """Test 2: No file attached -> 422."""
     response = client.post(
-        "/api/enhance",
-        headers={"Authorization": "Bearer fake-token"}
+        "/api/enhance", headers={"Authorization": "Bearer fake-token"}
     )
     assert response.status_code == 422
 
@@ -121,7 +129,7 @@ async def test_enhance_file_too_large(client, mock_verify_token):
     response = client.post(
         "/api/enhance",
         headers={"Authorization": "Bearer fake-token"},
-        files={"file": ("big.png", big_file, "image/png")}
+        files={"file": ("big.png", big_file, "image/png")},
     )
     assert response.status_code == 413
 
@@ -132,7 +140,7 @@ async def test_enhance_unsupported_format(client, mock_verify_token):
     response = client.post(
         "/api/enhance",
         headers={"Authorization": "Bearer fake-token"},
-        files={"file": ("test.txt", b"text", "text/plain")}
+        files={"file": ("test.txt", b"text", "text/plain")},
     )
     assert response.status_code == 415
 
@@ -141,34 +149,42 @@ async def test_enhance_unsupported_format(client, mock_verify_token):
 async def test_enhance_valid_upload(client, mock_verify_token, mock_enhance_image):
     """Test 1, 6, 7: Valid upload -> 200, job status completed, stats updated."""
     client.get("/api/profile", headers={"Authorization": "Bearer fake-token"})
-    
+
     # 1x1 black PNG
     import base64
-    valid_png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
-    
+
+    valid_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+    )
+
     response = client.post(
         "/api/enhance",
         headers={"Authorization": "Bearer fake-token"},
-        files={"file": ("test.png", valid_png, "image/png")}
+        files={"file": ("test.png", valid_png, "image/png")},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert "job_id" in data
     assert data["status"] == "completed"
     assert data["result_url"].startswith("/api/results/")
     assert data["output_w"] == 512
-    
+
     # Check DB state
     from db.session import AsyncSessionLocal
+
     async with AsyncSessionLocal() as session:
         # Check job
-        job_res = await session.execute(select(EnhancementJob).where(EnhancementJob.id == data["job_id"]))
+        job_res = await session.execute(
+            select(EnhancementJob).where(EnhancementJob.id == data["job_id"])
+        )
         job = job_res.scalar_one()
         assert job.status == "completed"
-        
+
         # Check stats
-        stats_res = await session.execute(select(UserUsageStats).where(UserUsageStats.user_id == job.user_id))
+        stats_res = await session.execute(
+            select(UserUsageStats).where(UserUsageStats.user_id == job.user_id)
+        )
         stats = stats_res.scalar_one()
         assert stats.successful_jobs == 1
         assert stats.total_jobs == 1
@@ -178,36 +194,46 @@ async def test_enhance_valid_upload(client, mock_verify_token, mock_enhance_imag
 async def test_enhance_inference_error(client, mock_verify_token, mock_enhance_image):
     """Test 8: SRGAN mock raises RuntimeError -> job status = "failed", response 500."""
     client.get("/api/profile", headers={"Authorization": "Bearer fake-token"})
-    
+
     mock_enhance_image.side_effect = RuntimeError("GPU out of memory")
-    
+
     import base64
-    valid_png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==")
-    
+
+    valid_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+    )
+
     response = client.post(
         "/api/enhance",
         headers={"Authorization": "Bearer fake-token"},
-        files={"file": ("test.png", valid_png, "image/png")}
+        files={"file": ("test.png", valid_png, "image/png")},
     )
-    
+
     assert response.status_code == 500
     assert "error" in response.json()["detail"].lower()
-    
+
     # Check DB state for failed job
     from db.session import AsyncSessionLocal
+
     async with AsyncSessionLocal() as session:
         # Find the user
-        user_res = await session.execute(select(User).where(User.firebase_uid == "test-uid-001"))
+        user_res = await session.execute(
+            select(User).where(User.firebase_uid == "test-uid-001")
+        )
         user = user_res.scalar_one()
-        
+
         # Check job
-        job_res = await session.execute(select(EnhancementJob).where(EnhancementJob.user_id == user.id))
+        job_res = await session.execute(
+            select(EnhancementJob).where(EnhancementJob.user_id == user.id)
+        )
         job = job_res.scalars().first()
         assert job.status == "failed"
         assert job.error_message == "GPU out of memory"
-        
+
         # Check stats
-        stats_res = await session.execute(select(UserUsageStats).where(UserUsageStats.user_id == user.id))
+        stats_res = await session.execute(
+            select(UserUsageStats).where(UserUsageStats.user_id == user.id)
+        )
         stats = stats_res.scalar_one()
         assert stats.failed_jobs == 1
         assert stats.successful_jobs == 0
