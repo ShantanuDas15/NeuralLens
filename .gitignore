@@ -20,6 +20,7 @@ ENV/
 .env.*
 !.env.example
 firebase-service-account.json
+serviceAccountKey.json
 *.pem
 *.key
 
