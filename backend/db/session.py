@@ -13,9 +13,19 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 logger = logging.getLogger(__name__)
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    if "sqlite" in str(type(dbapi_connection)).lower():
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def _make_engine():
@@ -27,15 +37,18 @@ def _make_engine():
     from config import settings  # noqa: PLC0415
 
     connect_args = {}
+    kwargs = {"echo": settings.debug, "future": True}
+
     if "sqlite" in settings.database_url:
         connect_args["check_same_thread"] = False
+        if ":memory:" in settings.database_url:
+            from sqlalchemy.pool import StaticPool
 
-    return create_async_engine(
-        settings.database_url,
-        echo=settings.debug,
-        future=True,
-        connect_args=connect_args,
-    )
+            kwargs["poolclass"] = StaticPool
+
+    kwargs["connect_args"] = connect_args
+
+    return create_async_engine(settings.database_url, **kwargs)
 
 
 # Module-level engine — created once when this module is first imported.
