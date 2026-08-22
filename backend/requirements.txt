@@ -1,0 +1,29 @@
+# ==============================================================================
+# NeuralLens Backend — Production Dependencies
+# ==============================================================================
+
+# --- Core API Framework -------------------------------------------------------
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# --- Data Validation & Settings -----------------------------------------------
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+python-dotenv>=1.0.0
+
+# --- Database -----------------------------------------------------------------
+sqlalchemy>=2.0.30
+aiosqlite>=0.20.0
+
+# --- Authentication -----------------------------------------------------------
+firebase-admin>=6.5.0
+
+# --- Computer Vision & ML -----------------------------------------------------
+# Install PyTorch with CUDA 12.4 support separately via:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+basicsr>=1.4.2
+realesrgan>=0.3.0
+opencv-python-headless>=4.10.0
+Pillow>=12.1.1
+numpy>=1.26.0

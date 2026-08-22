@@ -1,0 +1,66 @@
+# =============================================================================
+# NeuralLens — .gitignore
+# =============================================================================
+
+# ----- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# ----- Virtual Environments --------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+
+# ----- Environment & Secrets -------------------------------------------------
+.env
+.env.*
+!.env.example
+firebase-service-account.json
+*.pem
+*.key
+
+# ----- Database Files --------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+neurallens_test.db
+
+# ----- Test & Coverage Artefacts ---------------------------------------------
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# ----- ML Model Weights (large binaries) ------------------------------------
+backend/weights/*.pth
+backend/weights/*.pt
+backend/weights/*.ckpt
+backend/weights/*.bin
+
+# ----- User Data Directories -------------------------------------------------
+backend/uploads/
+backend/results/
+
+# ----- Build & Distribution --------------------------------------------------
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# ----- IDE & OS Artefacts ----------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# ----- Logs ------------------------------------------------------------------
+*.log
+logs/
