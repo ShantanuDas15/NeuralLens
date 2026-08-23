@@ -51,7 +51,7 @@ const Navbar = () => {
               <img src={user.photoURL} alt="Profile" className="profile-avatar" />
             ) : (
               <div className="profile-avatar-fallback">
-                {user?.email?.[0].toUpperCase() || 'U'}
+                <User size={20} />
               </div>
             )}
           </button>
@@ -94,7 +94,7 @@ const Navbar = () => {
                 <img src={user.photoURL} alt="Profile" className="profile-avatar" />
               ) : (
                 <div className="profile-avatar-fallback">
-                  {user?.email?.[0].toUpperCase() || 'U'}
+                  <User size={24} />
                 </div>
               )}
               <div className="mobile-user-text">
