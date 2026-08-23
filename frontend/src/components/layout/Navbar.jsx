@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { LayoutDashboard, History, LogOut, User, Menu, X } from 'lucide-react';
+import { Home, History, LogOut, User, Menu, X } from 'lucide-react';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -36,7 +36,7 @@ const Navbar = () => {
         {/* Desktop Navigation */}
         <div className="navbar-desktop-links">
           <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <LayoutDashboard size={18} />
+            <Home size={18} />
             <span>Dashboard</span>
           </NavLink>
           <NavLink to="/history" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
@@ -118,7 +118,7 @@ const Navbar = () => {
           </div>
           <div className="mobile-menu-links">
             <NavLink to="/" className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`} onClick={closeMenus}>
-              <LayoutDashboard size={20} />
+              <Home size={20} />
               <span>Dashboard</span>
             </NavLink>
             <NavLink to="/history" className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`} onClick={closeMenus}>
