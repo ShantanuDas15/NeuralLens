@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import Button from '../ui/Button';
 import './ImageCompare.css';
@@ -6,8 +6,11 @@ import './ImageCompare.css';
 const ImageCompare = ({ result, onReset }) => {
   const [sliderPos, setSliderPos] = useState(50);
   const containerRef = useRef(null);
+  
+  // Keep stable reference to latest handleDrag logic without changing function identity
+  const handleDragRef = useRef(null);
 
-  const handleDrag = (e) => {
+  handleDragRef.current = (e) => {
     if (!containerRef.current) return;
     
     // Get mouse or touch position
@@ -22,26 +25,44 @@ const ImageCompare = ({ result, onReset }) => {
     setSliderPos(pos);
   };
 
-  const startDrag = (e) => {
-    handleDrag(e);
-    // Add global event listeners for mouse/touch move
-    window.addEventListener('mousemove', handleDrag);
-    window.addEventListener('touchmove', handleDrag, { passive: false });
-    window.addEventListener('mouseup', stopDrag);
-    window.addEventListener('touchend', stopDrag);
+  const handleDragStable = useCallback((e) => {
+    handleDragRef.current?.(e);
+  }, []);
+
+  const handleKeyDown = (e) => {
+    let newPos = sliderPos;
+    if (e.key === 'ArrowLeft') {
+      newPos -= 5;
+    } else if (e.key === 'ArrowRight') {
+      newPos += 5;
+    }
+    
+    if (newPos !== sliderPos) {
+      e.preventDefault();
+      setSliderPos(Math.max(0, Math.min(newPos, 100)));
+    }
   };
 
-  const stopDrag = () => {
-    window.removeEventListener('mousemove', handleDrag);
-    window.removeEventListener('touchmove', handleDrag);
-    window.removeEventListener('mouseup', stopDrag);
-    window.removeEventListener('touchend', stopDrag);
+  const stopDragRef = useRef(null);
+  stopDragRef.current = () => {
+    window.removeEventListener('mousemove', handleDragStable);
+    window.removeEventListener('touchmove', handleDragStable);
+    window.removeEventListener('mouseup', stopDragRef.current);
+    window.removeEventListener('touchend', stopDragRef.current);
+  };
+
+  const startDrag = (e) => {
+    handleDragStable(e);
+    window.addEventListener('mousemove', handleDragStable);
+    window.addEventListener('touchmove', handleDragStable, { passive: false });
+    window.addEventListener('mouseup', stopDragRef.current);
+    window.addEventListener('touchend', stopDragRef.current);
   };
 
   useEffect(() => {
     // Cleanup listeners on unmount
     return () => {
-      stopDrag();
+      stopDragRef.current?.();
     };
   }, []);
 
@@ -58,7 +79,7 @@ const ImageCompare = ({ result, onReset }) => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Download failed:", err);
+      if (import.meta.env.DEV) console.error("Download failed:", err);
     }
   };
 
@@ -101,6 +122,7 @@ const ImageCompare = ({ result, onReset }) => {
           aria-valuemax="100"
           aria-label="Image comparison slider"
           tabIndex={0}
+          onKeyDown={handleKeyDown}
         >
           <div className="compare-slider-handle">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

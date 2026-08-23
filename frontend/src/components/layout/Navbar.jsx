@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Home, History, LogOut, User, Menu, X } from 'lucide-react';
@@ -10,13 +10,26 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
       await signOut();
       navigate('/login');
     } catch (error) {
-      console.error('Failed to log out', error);
+      if (import.meta.env.DEV) console.error('Failed to log out', error);
     }
   };
 
@@ -46,7 +59,7 @@ const Navbar = () => {
         </div>
 
         {/* Desktop Profile Dropdown */}
-        <div className="navbar-desktop-profile">
+        <div className="navbar-desktop-profile" ref={dropdownRef}>
           <button className="profile-btn" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
             {user?.photoURL && !imgError ? (
               <img 

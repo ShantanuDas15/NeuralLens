@@ -1,23 +1,20 @@
 import { useEffect } from 'react';
-import { User as UserIcon, Calendar, Image as ImageIcon, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { User as UserIcon, Calendar, Image as ImageIcon, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api';
 import useApi from '../hooks/useApi';
 import Spinner from '../components/ui/Spinner';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import './Profile.css';
 
 const Profile = () => {
   const { user } = useAuth();
   
-  const fetchProfile = async () => {
-    return await api.get('/profile');
-  };
-
-  const { data: profile, loading, error, execute } = useApi(fetchProfile);
+  const { data: profile, loading, error, execute } = useApi();
 
   useEffect(() => {
-    execute().catch(() => {});
+    execute(() => api.get('/profile')).catch(() => {});
   }, [execute]);
 
   if (loading && !profile) {
@@ -55,6 +52,17 @@ const Profile = () => {
         <div className="profile-info-header">
           <h1 className="profile-name">{user?.displayName || 'NeuralLens User'}</h1>
           <p className="profile-email">{user?.email}</p>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={() => execute(() => api.get('/profile'))}
+            disabled={loading}
+            icon={<RefreshCw size={16} className={loading ? "spin" : ""} />}
+          >
+            Refresh
+          </Button>
         </div>
       </div>
 

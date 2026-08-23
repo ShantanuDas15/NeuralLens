@@ -14,8 +14,8 @@ const GoogleSignInButton = ({ onError }) => {
       await signInWithPopup(auth, googleProvider);
       navigate('/');
     } catch (err) {
-      console.error('Google Sign-In Error:', err);
-      if (onError) onError(err.message || 'Failed to sign in with Google.');
+      if (import.meta.env.DEV) console.error('Google Sign-In Error:', err);
+      if (onError) onError('Google Sign-In failed. Please try again.');
     } finally {
       setLoading(false);
     }

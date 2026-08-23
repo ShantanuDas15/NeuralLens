@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import DropZone from '../components/upload/DropZone';
 import UploadProgress from '../components/upload/UploadProgress';
@@ -11,6 +11,8 @@ const Dashboard = () => {
   const [appState, setAppState] = useState('idle');
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const originalUrlRef = useRef(null);
+  const abortControllerRef = useRef(null);
   
   const [timerStart, setTimerStart] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -26,33 +28,55 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [appState, timerStart]);
 
+  // Clean up object URL and abort pending request on unmount
+  useEffect(() => {
+    return () => {
+      if (originalUrlRef.current) {
+        URL.revokeObjectURL(originalUrlRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const handleFileSelected = async (file) => {
     setAppState('uploading');
     setErrorMsg('');
     setResult(null);
 
+    // Clean up previous URL if it exists
+    if (originalUrlRef.current) {
+      URL.revokeObjectURL(originalUrlRef.current);
+    }
+
     // Create object URL for original image preview in ImageCompare
     const originalUrl = URL.createObjectURL(file);
+    originalUrlRef.current = originalUrl;
 
     const formData = new FormData();
     formData.append('file', file);
+    
+    abortControllerRef.current = new AbortController();
 
     try {
-      // Simulate slight delay for "uploading" animation before hitting processing
-      setTimeout(() => {
-        setAppState('processing');
-        setTimerStart(Date.now());
-      }, 800);
+      // Small artificial delay to show uploading state briefly
+      await new Promise(r => setTimeout(r, 600));
+      
+      setAppState('processing');
+      const startMs = Date.now();
+      setTimerStart(startMs);
 
       const response = await api.post('/enhance', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        signal: abortControllerRef.current.signal
       });
 
       // Artificial minimum processing time (to show cool animation)
       const minTimeMs = 1500;
-      const actualTimeMs = Date.now() - timerStart;
+      const actualTimeMs = Date.now() - startMs;
       if (actualTimeMs < minTimeMs) {
         await new Promise(r => setTimeout(r, minTimeMs - actualTimeMs));
       }
@@ -65,7 +89,11 @@ const Dashboard = () => {
       toast.success('Image enhanced successfully!');
 
     } catch (err) {
-      console.error("Enhancement failed:", err);
+      if (err.name === 'CanceledError' || err.message === 'canceled') {
+        if (import.meta.env.DEV) console.log('Upload canceled');
+        return;
+      }
+      if (import.meta.env.DEV) console.error("Enhancement failed:", err);
       let msg = 'An unexpected error occurred.';
       if (err.response) {
         if (err.response.status === 413) msg = 'File is too large (Max 2MB).';
@@ -84,6 +112,14 @@ const Dashboard = () => {
     setResult(null);
     setErrorMsg('');
     setElapsedTime(0);
+    if (originalUrlRef.current) {
+      URL.revokeObjectURL(originalUrlRef.current);
+      originalUrlRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
   };
 
   return (

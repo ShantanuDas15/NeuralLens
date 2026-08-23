@@ -6,20 +6,17 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import { toast } from '../components/ui/Toast';
+import HistoryCardSkeleton from '../components/history/HistoryCardSkeleton';
 import './History.css';
 
 const History = () => {
   const [page, setPage] = useState(1);
   const pageSize = 9;
   
-  const fetchHistory = async (pageNumber) => {
-    return await api.get(`/history?page=${pageNumber}&page_size=${pageSize}`);
-  };
-
-  const { data, loading, error, execute } = useApi(fetchHistory);
+  const { data, loading, error, execute } = useApi();
 
   useEffect(() => {
-    execute(page).catch(() => {});
+    execute(() => api.get(`/history?page=${page}&page_size=${pageSize}`)).catch(() => {});
   }, [page, execute]);
 
   const handleDownload = async (url, id) => {
@@ -43,9 +40,18 @@ const History = () => {
 
   if (loading && !data) {
     return (
-      <div className="history-loading page-enter">
-        <Spinner size="lg" />
-        <p>Loading history...</p>
+      <div className="history-container page-enter">
+        <div className="history-header">
+          <div>
+            <h1 className="history-title">Enhancement History</h1>
+            <p className="history-subtitle">View and download your previously processed images.</p>
+          </div>
+        </div>
+        <div className="history-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <HistoryCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -72,7 +78,16 @@ const History = () => {
           <h1 className="history-title">Enhancement History</h1>
           <p className="history-subtitle">View and download your previously processed images.</p>
         </div>
-        <div className="history-stats">
+        <div className="history-stats" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={() => execute(() => api.get(`/history?page=${page}&page_size=${pageSize}`))}
+            disabled={loading}
+            icon={<RefreshCw size={16} className={loading ? "spin" : ""} />}
+          >
+            Refresh
+          </Button>
           <Badge status="completed">{total} Total Images</Badge>
         </div>
       </div>
@@ -110,6 +125,7 @@ const History = () => {
                       variant="primary" 
                       disabled={job.status !== 'completed'}
                       onClick={() => handleDownload(job.result_url, job.job_id)}
+                      aria-label="Download Image"
                     >
                       <Download size={16} />
                     </Button>
@@ -119,6 +135,7 @@ const History = () => {
                       rel="noopener noreferrer"
                       className={`btn btn-sm btn-ghost ${job.status !== 'completed' ? 'disabled' : ''}`}
                       onClick={(e) => job.status !== 'completed' && e.preventDefault()}
+                      aria-label="View Original"
                     >
                       <ExternalLink size={16} />
                     </a>

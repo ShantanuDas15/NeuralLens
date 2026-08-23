@@ -4,6 +4,7 @@ import { auth } from '../firebase';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
+import { getFirebaseErrorMessage } from '../utils/firebaseErrors';
 import './Auth.css';
 
 const Signup = () => {
@@ -58,9 +59,8 @@ const Signup = () => {
       });
       navigate('/');
     } catch (err) {
-      console.error("Signup Error:", err);
-      const errorMsg = err.code ? err.code.replace('auth/', '').replace(/-/g, ' ') : err.message;
-      setError(`Signup failed: ${errorMsg}`);
+      if (import.meta.env.DEV) console.error("Signup Error:", err);
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { auth } from '../firebase';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
+import { getFirebaseErrorMessage } from '../utils/firebaseErrors';
 import './Auth.css'; // Shared auth styles
 
 const Login = () => {
@@ -33,10 +34,8 @@ const Login = () => {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/');
     } catch (err) {
-      console.error("Login Error:", err);
-      // Clean up Firebase error messages
-      const errorMsg = err.code ? err.code.replace('auth/', '').replace(/-/g, ' ') : err.message;
-      setError(`Login failed: ${errorMsg}`);
+      if (import.meta.env.DEV) console.error("Login Error:", err);
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }

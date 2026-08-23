@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { UploadCloud, Image as ImageIcon, X } from 'lucide-react';
 import Button from '../ui/Button';
 import './DropZone.css';
@@ -8,6 +8,18 @@ const DropZone = ({ onFileSelected }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
+  
+  const previewUrl = useMemo(() => {
+    return selectedFile ? URL.createObjectURL(selectedFile) : null;
+  }, [selectedFile]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const validateFile = (file) => {
     setError('');
@@ -97,7 +109,7 @@ const DropZone = ({ onFileSelected }) => {
           <div className="dropzone-preview">
             <div className="preview-image-container">
               <img 
-                src={URL.createObjectURL(selectedFile)} 
+                src={previewUrl} 
                 alt="Preview" 
                 className="preview-image"
               />

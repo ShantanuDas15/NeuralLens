@@ -1,37 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, createContext, useContext } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import './Toast.css';
 
-// A simple local state manager to trigger toasts from anywhere
-let toastCount = 0;
-let addToastHandler = null;
+const ToastContext = createContext(null);
 
 export const toast = {
-  success: (message, duration) => addToastHandler?.({ id: ++toastCount, type: 'success', message, duration }),
-  error: (message, duration) => addToastHandler?.({ id: ++toastCount, type: 'error', message, duration }),
-  info: (message, duration) => addToastHandler?.({ id: ++toastCount, type: 'info', message, duration })
+  dispatch: null,
+  success: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'success', message, duration } }),
+  error: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'error', message, duration } }),
+  info: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'info', message, duration } })
 };
 
-const ToastContainer = () => {
-  const [toasts, setToasts] = useState([]);
+export const useToast = () => useContext(ToastContext);
+
+const toastReducer = (state, action) => {
+  switch (action.type) {
+    case 'ADD':
+      return [...state, action.payload];
+    case 'REMOVE':
+      return state.filter(t => t.id !== action.payload);
+    default:
+      return state;
+  }
+};
+
+export const ToastProvider = ({ children }) => {
+  const [toasts, dispatch] = useReducer(toastReducer, []);
 
   useEffect(() => {
-    addToastHandler = (toastParams) => {
-      setToasts((prev) => [...prev, toastParams]);
-    };
-    return () => { addToastHandler = null; };
+    toast.dispatch = dispatch;
+    return () => { toast.dispatch = null; };
   }, []);
 
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter(t => t.id !== id));
-  };
-
   return (
-    <div className="ui-toast-container">
-      {toasts.map(t => (
-        <ToastItem key={t.id} toast={t} onRemove={() => removeToast(t.id)} />
-      ))}
-    </div>
+    <ToastContext.Provider value={dispatch}>
+      {children}
+      <div className="ui-toast-container">
+        {toasts.map(t => (
+          <ToastItem key={t.id} toast={t} onRemove={() => dispatch({ type: 'REMOVE', payload: t.id })} />
+        ))}
+      </div>
+    </ToastContext.Provider>
   );
 };
 
@@ -58,4 +67,4 @@ const ToastItem = ({ toast, onRemove }) => {
   );
 };
 
-export default ToastContainer;
+export default ToastProvider;

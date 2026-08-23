@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
 
-const useApi = (apiFunc) => {
+const useApi = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const execute = useCallback(async (...args) => {
+  const execute = useCallback(async (apiFunc, ...args) => {
     try {
       setLoading(true);
       setError(null);
@@ -13,7 +13,7 @@ const useApi = (apiFunc) => {
       setData(result.data);
       return result.data;
     } catch (err) {
-      console.error("API Error:", err);
+      if (import.meta.env.DEV) console.error("API Error:", err);
       // Extract error message safely from Axios error response or default to err.message
       const message = err.response?.data?.detail || err.response?.data?.message || err.message || 'An unexpected error occurred';
       setError(message);
@@ -21,7 +21,7 @@ const useApi = (apiFunc) => {
     } finally {
       setLoading(false);
     }
-  }, [apiFunc]);
+  }, []);
 
   return { data, loading, error, execute };
 };
