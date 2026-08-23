@@ -9,6 +9,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -47,8 +48,14 @@ const Navbar = () => {
         {/* Desktop Profile Dropdown */}
         <div className="navbar-desktop-profile">
           <button className="profile-btn" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt="Profile" className="profile-avatar" />
+            {user?.photoURL && !imgError ? (
+              <img 
+                src={user.photoURL} 
+                alt="Profile" 
+                className="profile-avatar"
+                referrerPolicy="no-referrer"
+                onError={() => setImgError(true)}
+              />
             ) : (
               <div className="profile-avatar-fallback">
                 <User size={20} />
@@ -90,8 +97,14 @@ const Navbar = () => {
         <div className="mobile-menu page-enter">
           <div className="mobile-menu-header">
             <div className="mobile-user-info">
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="profile-avatar" />
+              {user?.photoURL && !imgError ? (
+                <img 
+                  src={user.photoURL} 
+                  alt="Profile" 
+                  className="profile-avatar"
+                  referrerPolicy="no-referrer"
+                  onError={() => setImgError(true)}
+                />
               ) : (
                 <div className="profile-avatar-fallback">
                   <User size={24} />
