@@ -1,17 +1,47 @@
-import { useEffect } from 'react';
-import { User as UserIcon, Calendar, Image as ImageIcon, CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { User as UserIcon, Image as ImageIcon, CheckCircle, XCircle, RefreshCw, Edit2, Save } from 'lucide-react';
+import { updateProfile } from 'firebase/auth';
+import { auth } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api';
 import useApi from '../hooks/useApi';
 import Spinner from '../components/ui/Spinner';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { toast } from '../components/ui/Toast';
 import './Profile.css';
 
 const Profile = () => {
   const { user } = useAuth();
-  
   const { data: profile, loading, error, execute } = useApi();
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  const handleEditClick = () => {
+    setNewName(user?.displayName || '');
+    setIsEditing(true);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setUpdateLoading(true);
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: newName });
+        // Force token refresh to immediately sync to backend next request
+        await auth.currentUser.getIdToken(true);
+        // Sync with backend
+        await execute(() => api.get('/profile'));
+        toast.success("Profile updated successfully");
+      }
+      setIsEditing(false);
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("Update profile error:", err);
+      toast.error("Failed to update profile");
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
 
   useEffect(() => {
     execute(() => api.get('/profile')).catch(() => {});
@@ -50,8 +80,59 @@ const Profile = () => {
           )}
         </div>
         <div className="profile-info-header">
-          <h1 className="profile-name">{user?.displayName || 'NeuralLens User'}</h1>
-          <p className="profile-email">{user?.email}</p>
+          {isEditing ? (
+            <div className="profile-edit-form">
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={newName} 
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Enter username"
+                  disabled={updateLoading}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email <span className="text-muted" style={{ fontSize: '0.8rem', marginLeft: '8px' }}>(Cannot be changed)</span></label>
+                <input 
+                  type="email" 
+                  className="form-input" 
+                  value={user?.email || ''} 
+                  disabled
+                />
+              </div>
+              <div className="profile-edit-actions" style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <Button 
+                  size="sm" 
+                  variant="primary" 
+                  onClick={handleSaveProfile}
+                  disabled={updateLoading || !newName.trim() || newName.trim() === user?.displayName}
+                  icon={<Save size={16} />}
+                >
+                  {updateLoading ? 'Saving...' : 'Save'}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  onClick={() => setIsEditing(false)}
+                  disabled={updateLoading}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="profile-name-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 className="profile-name">{user?.displayName || 'NeuralLens User'}</h1>
+                <button className="btn btn-sm btn-ghost" style={{ padding: '4px' }} onClick={handleEditClick} aria-label="Edit Username">
+                  <Edit2 size={16} />
+                </button>
+              </div>
+              <p className="profile-email">{user?.email}</p>
+            </>
+          )}
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <Button 
@@ -67,37 +148,6 @@ const Profile = () => {
       </div>
 
       <div className="profile-content">
-        <Card className="profile-card">
-          <h2 className="card-title">Account Details</h2>
-          <div className="details-list">
-            <div className="detail-item">
-              <UserIcon size={18} className="detail-icon" />
-              <div className="detail-text">
-                <span className="detail-label">Account ID</span>
-                <span className="detail-value">{user?.uid}</span>
-              </div>
-            </div>
-            <div className="detail-item">
-              <Calendar size={18} className="detail-icon" />
-              <div className="detail-text">
-                <span className="detail-label">Member Since</span>
-                <span className="detail-value">
-                  {profile?.member_since ? new Date(profile.member_since).toLocaleDateString() : 'Unknown'}
-                </span>
-              </div>
-            </div>
-            <div className="detail-item">
-              <Clock size={18} className="detail-icon" />
-              <div className="detail-text">
-                <span className="detail-label">Last Enhanced Activity</span>
-                <span className="detail-value">
-                  {stats.last_job_at ? new Date(stats.last_job_at).toLocaleString() : 'Never'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </Card>
-
         <Card className="profile-card">
           <h2 className="card-title">Usage Statistics</h2>
           <div className="stats-grid">
