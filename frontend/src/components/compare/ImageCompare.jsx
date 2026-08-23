@@ -95,6 +95,12 @@ const ImageCompare = ({ result, onReset }) => {
         <div 
           className="compare-slider" 
           style={{ left: `${sliderPos}%` }}
+          role="slider"
+          aria-valuenow={Math.round(sliderPos)}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Image comparison slider"
+          tabIndex={0}
         >
           <div className="compare-slider-handle">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
