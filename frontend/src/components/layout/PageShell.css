@@ -1,0 +1,22 @@
+.page-shell {
+  min-height: calc(100vh - 4rem); /* Viewport height minus navbar height */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-shell-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .page-shell-container {
+    padding: 1.5rem 1rem;
+  }
+}
