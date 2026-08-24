@@ -167,3 +167,54 @@ def test_history_unauthenticated(client):
     """Test 6: Unauthenticated -> 422/401."""
     response = client.get("/api/history")
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_delete_history_job(client, mock_verify_token):
+    """Test 7: Soft delete job works and 404s on second try."""
+    from db.session import AsyncSessionLocal
+
+    # 1. First, call get to ensure user exists
+    client.get("/api/history", headers={"Authorization": "Bearer fake-token"})
+
+    # 2. Setup a job specifically for deletion
+    job_id = str(uuid4())
+    async with AsyncSessionLocal() as session:
+        user = (
+            await session.execute(
+                select(User).where(User.firebase_uid == "test-uid-001")
+            )
+        ).scalar_one()
+        model = (await session.execute(select(ModelConfig).limit(1))).scalar_one()
+
+        session.add(
+            EnhancementJob(
+                id=job_id,
+                user_id=user.id,
+                model_config_id=model.id,
+                original_filename="to_be_deleted.png",
+                status="completed",
+                scale_factor=4.0,
+                input_file_path="/tmp/fake",
+                input_size_bytes=100,
+                input_width=100,
+                input_height=100,
+                input_format="PNG",
+            )
+        )
+        await session.commit()
+
+    # 3. Soft delete the job
+    response = client.delete(
+        f"/api/history/{job_id}",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+    assert response.status_code == 204
+
+    # 4. Try to delete it again - should be 404
+    response_again = client.delete(
+        f"/api/history/{job_id}",
+        headers={"Authorization": "Bearer fake-token"},
+    )
+    assert response_again.status_code == 404
+

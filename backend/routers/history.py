@@ -2,9 +2,10 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from db.session import get_db
 from middleware.auth import get_current_user
@@ -74,3 +75,33 @@ async def get_history(
         page=page,
         page_size=page_size,
     )
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_history_job(
+    job_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Soft-delete an enhancement job (sets deleted_at)."""
+    # Find the job ensuring it belongs to the current user
+    result = await db.execute(
+        select(EnhancementJob).where(
+            EnhancementJob.id == job_id,
+            EnhancementJob.user_id == current_user.id,
+            EnhancementJob.deleted_at.is_(None)
+        )
+    )
+    job = result.scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Job not found or already deleted"
+        )
+
+    # Soft delete
+    job.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    
+    return None

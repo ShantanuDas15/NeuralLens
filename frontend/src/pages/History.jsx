@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Download, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Download, ExternalLink, RefreshCw, AlertCircle, Trash2, RotateCcw } from 'lucide-react';
 import api from '../api';
 import useApi from '../hooks/useApi';
 import Button from '../components/ui/Button';
@@ -12,6 +13,8 @@ import './History.css';
 const History = () => {
   const [page, setPage] = useState(1);
   const pageSize = 9;
+  const navigate = useNavigate();
+  const [deleteLoading, setDeleteLoading] = useState(null);
   
   const { data, loading, error, execute } = useApi();
 
@@ -35,6 +38,26 @@ const History = () => {
       toast.success('Download started');
     } catch (err) {
       toast.error('Failed to download image');
+    }
+  };
+
+  const handleProcessAgain = (job) => {
+    toast.info(`Ready to re-enhance! Please select "${job.original_filename}"`);
+    navigate('/');
+  };
+
+  const handleDelete = async (job) => {
+    if (!window.confirm(`Are you sure you want to remove "${job.original_filename}" from your history?`)) return;
+    
+    try {
+      setDeleteLoading(job.job_id);
+      await api.delete(`/history/${job.job_id}`);
+      toast.success('Job removed from history');
+      execute(() => api.get(`/history?page=${page}&page_size=${pageSize}`));
+    } catch (err) {
+      toast.error('Failed to delete job');
+    } finally {
+      setDeleteLoading(null);
     }
   };
 
@@ -126,6 +149,7 @@ const History = () => {
                       disabled={job.status !== 'completed'}
                       onClick={() => handleDownload(job.result_url, job.job_id)}
                       aria-label="Download Image"
+                      title="Download"
                     >
                       <Download size={16} />
                     </Button>
@@ -136,9 +160,29 @@ const History = () => {
                       className={`btn btn-sm btn-ghost ${job.status !== 'completed' ? 'disabled' : ''}`}
                       onClick={(e) => job.status !== 'completed' && e.preventDefault()}
                       aria-label="View Original"
+                      title="View Full Size"
                     >
                       <ExternalLink size={16} />
                     </a>
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={() => handleProcessAgain(job)}
+                      aria-label="Process Again"
+                      title="Process Again"
+                    >
+                      <RotateCcw size={16} />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="danger" 
+                      onClick={() => handleDelete(job)}
+                      disabled={deleteLoading === job.job_id}
+                      aria-label="Delete"
+                      title="Remove from history"
+                    >
+                      {deleteLoading === job.job_id ? <Spinner size="sm" /> : <Trash2 size={16} />}
+                    </Button>
                   </div>
                 </div>
                 
