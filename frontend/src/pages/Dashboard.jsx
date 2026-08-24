@@ -68,6 +68,7 @@ const Dashboard = () => {
     formData.append('scale', scale);
     
     abortControllerRef.current = new AbortController();
+    const toastId = toast.loading(`Processing image at ${scale}x scale...`);
 
     try {
       // Small artificial delay to show uploading state briefly
@@ -96,10 +97,13 @@ const Dashboard = () => {
         original_url: previewUrl // injecting local preview URL
       });
       setAppState('success');
+      toast.dismiss(toastId);
       toast.success('Image enhanced successfully!');
 
     } catch (err) {
+      toast.dismiss(toastId);
       if (err.name === 'CanceledError' || err.message === 'canceled') {
+        toast.info('Enhancement cancelled');
         if (import.meta.env.DEV) console.log('Upload canceled');
         return;
       }

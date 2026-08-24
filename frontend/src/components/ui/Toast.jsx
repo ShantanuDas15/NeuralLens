@@ -1,14 +1,34 @@
 import { useEffect, useReducer, createContext, useContext } from 'react';
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, Loader2 } from 'lucide-react';
 import './Toast.css';
 
 const ToastContext = createContext(null);
 
 export const toast = {
   dispatch: null,
-  success: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'success', message, duration } }),
-  error: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'error', message, duration } }),
-  info: (message, duration = 4000) => toast.dispatch?.({ type: 'ADD', payload: { id: Date.now() + Math.random(), type: 'info', message, duration } })
+  success: (message, duration = 4000) => {
+    const id = Date.now() + Math.random();
+    toast.dispatch?.({ type: 'ADD', payload: { id, type: 'success', message, duration } });
+    return id;
+  },
+  error: (message, duration = 4000) => {
+    const id = Date.now() + Math.random();
+    toast.dispatch?.({ type: 'ADD', payload: { id, type: 'error', message, duration } });
+    return id;
+  },
+  info: (message, duration = 4000) => {
+    const id = Date.now() + Math.random();
+    toast.dispatch?.({ type: 'ADD', payload: { id, type: 'info', message, duration } });
+    return id;
+  },
+  loading: (message) => {
+    const id = Date.now() + Math.random();
+    toast.dispatch?.({ type: 'ADD', payload: { id, type: 'loading', message, duration: 0 } });
+    return id;
+  },
+  dismiss: (id) => {
+    toast.dispatch?.({ type: 'REMOVE', payload: id });
+  }
 };
 
 export const useToast = () => useContext(ToastContext);
@@ -16,7 +36,7 @@ export const useToast = () => useContext(ToastContext);
 const toastReducer = (state, action) => {
   switch (action.type) {
     case 'ADD':
-      return [...state, action.payload];
+      return [...state.slice(-2), action.payload];
     case 'REMOVE':
       return state.filter(t => t.id !== action.payload);
     default:
@@ -46,6 +66,7 @@ export const ToastProvider = ({ children }) => {
 
 const ToastItem = ({ toast, onRemove }) => {
   useEffect(() => {
+    if (toast.duration === 0) return;
     const duration = toast.duration || 4000;
     const timer = setTimeout(() => {
       onRemove();
@@ -54,11 +75,12 @@ const ToastItem = ({ toast, onRemove }) => {
   }, [toast, onRemove]);
 
   const Icon = toast.type === 'success' ? CheckCircle : 
-               toast.type === 'error' ? AlertCircle : Info;
+               toast.type === 'error' ? AlertCircle : 
+               toast.type === 'loading' ? Loader2 : Info;
 
   return (
     <div className={`ui-toast ui-toast-${toast.type} page-enter`}>
-      <Icon className="ui-toast-icon" size={20} />
+      <Icon className={`ui-toast-icon ${toast.type === 'loading' ? 'spin' : ''}`} size={20} />
       <span className="ui-toast-message">{toast.message}</span>
       <button onClick={onRemove} className="ui-toast-close" aria-label="Close toast">
         <X size={16} />

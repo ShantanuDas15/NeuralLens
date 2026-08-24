@@ -125,7 +125,7 @@ Users cannot re-view the side-by-side comparison for a historical job. Clicking 
 
 ## Milestone 4.5 — Toast Queue & Enhanced Notifications
 
-**Priority**: 🟡 Medium | **Effort**: Low | **Impact**: Medium
+**Priority**: 🟡 Medium | **Effort**: Low | **Impact**: Medium | **Status**: ✅ Completed
 
 ### Problem
 The current Toast system shows a single toast at a time. If multiple events fire rapidly (e.g., download + refresh), one notification silently disappears.
