@@ -62,3 +62,45 @@ async def get_result_image(
         )
 
     return FileResponse(path=result_filepath, media_type="image/png")
+
+@router.get("/input/{job_id}")
+async def get_input_image(
+    job_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Serve the original LR input image file securely."""
+    try:
+        job_uuid = UUID(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
+
+    job_result = await db.execute(
+        select(EnhancementJob).where(
+            EnhancementJob.id == job_id, EnhancementJob.deleted_at.is_(None)
+        )
+    )
+    job = job_result.scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
+
+    if job.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+    input_filepath = Path(job.input_file_path)
+
+    if not input_filepath.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
+        )
+
+    # Assuming format is something like 'JPEG' or 'PNG', mapping to media type
+    media_type = f"image/{job.input_format.lower()}"
+    return FileResponse(path=input_filepath, media_type=media_type)

@@ -133,7 +133,7 @@ const ImageCompare = ({ result, onReset }) => {
 
         {/* Labels */}
         <div className="compare-label label-left">Original</div>
-        <div className="compare-label label-right">Enhanced 4x</div>
+        <div className="compare-label label-right">Enhanced {result.scale_factor || 4}x</div>
       </div>
 
       <div className="compare-metadata">
@@ -143,10 +143,12 @@ const ImageCompare = ({ result, onReset }) => {
       </div>
 
       <div className="compare-actions">
-        <Button variant="ghost" onClick={onReset} className="action-btn">
-          <RefreshCw size={18} className="mr-2" />
-          Enhance Another
-        </Button>
+        {onReset && (
+          <Button variant="ghost" onClick={onReset} className="action-btn">
+            <RefreshCw size={18} className="mr-2" />
+            Enhance Another
+          </Button>
+        )}
         <Button variant="primary" onClick={handleDownload} className="action-btn">
           <Download size={18} className="mr-2" />
           Download Enhanced

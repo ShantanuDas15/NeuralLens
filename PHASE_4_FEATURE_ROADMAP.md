@@ -94,13 +94,18 @@ All images are unconditionally upscaled 4×. This wastes processing time for use
 
 ## Milestone 4.4 — History Page: In-Page Comparison Viewer
 
-**Priority**: 🟡 Medium | **Effort**: Medium | **Impact**: High
+**Priority**: 🟡 Medium | **Effort**: Medium | **Impact**: High | **Status**: ✅ Completed
 
 ### Problem
 Users cannot re-view the side-by-side comparison for a historical job. Clicking the "View" icon opens the raw result image in a new browser tab — this is not the same rich experience as the interactive slider.
 
 ### Features
 - A **"Compare" button** on each history card that opens a **full-screen modal** with the `<ImageCompare />` slider pre-loaded with the stored original vs. enhanced images.
+
+### Tasks
+- [x] Refactor `<ImageCompare />` to be generic (if it isn't already).
+- [x] Add a "Compare" button to each history item.
+- [x] Implement an in-page modal or expandable section in `History.jsx` to render the comparison view.
 
 > **Challenge**: The original (LR) image URL is not currently stored. It is only available as a blob URL during the active session.
 

@@ -21,6 +21,7 @@ class HistoryItem(BaseModel):
     processing_time_ms: int | None = None
     created_at: datetime
     result_url: str | None = None
+    original_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

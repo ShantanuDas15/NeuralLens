@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, ExternalLink, RefreshCw, AlertCircle, Trash2, RotateCcw } from 'lucide-react';
+import { Download, ExternalLink, RefreshCw, AlertCircle, Trash2, RotateCcw, Columns } from 'lucide-react';
 import api from '../api';
 import useApi from '../hooks/useApi';
 import Button from '../components/ui/Button';
@@ -8,6 +8,7 @@ import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import { toast } from '../components/ui/Toast';
 import HistoryCardSkeleton from '../components/history/HistoryCardSkeleton';
+import ImageCompare from '../components/compare/ImageCompare';
 import './History.css';
 
 const History = () => {
@@ -15,6 +16,7 @@ const History = () => {
   const pageSize = 9;
   const navigate = useNavigate();
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [compareJob, setCompareJob] = useState(null);
   
   const { data, loading, error, execute } = useApi();
 
@@ -175,6 +177,16 @@ const History = () => {
                     </Button>
                     <Button 
                       size="sm" 
+                      variant="primary" 
+                      onClick={() => setCompareJob(job)}
+                      disabled={job.status !== 'completed'}
+                      aria-label="Compare"
+                      title="Compare Original & Enhanced"
+                    >
+                      <Columns size={16} />
+                    </Button>
+                    <Button 
+                      size="sm" 
                       variant="danger" 
                       onClick={() => handleDelete(job)}
                       disabled={deleteLoading === job.job_id}
@@ -234,6 +246,20 @@ const History = () => {
             </div>
           )}
         </>
+      )}
+
+      {compareJob && (
+        <div className="history-modal-overlay" onClick={() => setCompareJob(null)}>
+          <div className="history-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="history-modal-header">
+              <h3>Compare: {compareJob.original_filename}</h3>
+              <button className="history-modal-close" onClick={() => setCompareJob(null)}>×</button>
+            </div>
+            <div className="history-modal-body">
+              <ImageCompare result={compareJob} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

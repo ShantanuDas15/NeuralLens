@@ -66,6 +66,7 @@ async def get_history(
                 "result_url": (
                     f"/api/results/{job.id}.png" if job.status == "completed" else None
                 ),
+                "original_url": f"/api/results/input/{job.id}",
             }
         )
 
