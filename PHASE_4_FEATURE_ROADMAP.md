@@ -69,7 +69,7 @@ After selecting an image, users immediately kick off processing with no chance t
 
 ## Milestone 4.3 — Scale Factor Selection (2×, 4×, 8×)
 
-**Priority**: 🟡 Medium | **Effort**: Medium | **Impact**: High
+**Priority**: 🟡 Medium | **Effort**: Medium | **Impact**: High | **Status**: ✅ Completed
 
 ### Problem
 All images are unconditionally upscaled 4×. This wastes processing time for users who only need 2× upscaling and creates unnecessarily large output files.

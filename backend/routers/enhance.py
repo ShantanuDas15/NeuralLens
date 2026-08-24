@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,12 +44,19 @@ async def create_enhancement_job(
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    scale: Annotated[int, Form()] = 4,
 ):
     """Upscale an uploaded low-resolution image using Real-ESRGAN."""
     # 1 & 2. Validate file presence and format
     if not file or not file.filename:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No file attached"
+        )
+
+    if scale not in [2, 4, 8]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Scale factor must be 2, 4, or 8.",
         )
 
     ext = _get_extension(file.filename)
@@ -82,11 +89,12 @@ async def create_enhancement_job(
     job_id = str(uuid4())
     now = datetime.now(timezone.utc)
 
-    # Needs a model_config_id. We'll query for the first available RealESRGAN model
-    # (Since we seeded it in the migrations, it should exist, or we can just leave it None if nullable, but it's nullable=False)
+    # Needs a model_config_id for the requested scale
     from models.database import ModelConfig
 
-    model_config_result = await db.execute(select(ModelConfig).limit(1))
+    model_config_result = await db.execute(
+        select(ModelConfig).where(ModelConfig.scale_factor == scale)
+    )
     model_config = model_config_result.scalar_one_or_none()
     if not model_config:
         logger.error("No ModelConfig found in database!")
@@ -106,7 +114,7 @@ async def create_enhancement_job(
         input_height=input_h,
         input_format=ext.replace(".", "").upper(),
         status="pending",
-        scale_factor=4.0,
+        scale_factor=scale,
     )
     db.add(job)
     await db.commit()
@@ -125,7 +133,7 @@ async def create_enhancement_job(
     try:
         # Run blocking inference in a separate thread bounded by a semaphore
         async with inference_semaphore:
-            result_bytes, metadata = await asyncio.to_thread(enhance_image, input_bytes)
+            result_bytes, metadata = await asyncio.to_thread(enhance_image, input_bytes, scale)
     except Exception as exc:
         logger.error("Inference failed for job %s: %s", job_id, exc)
         job.status = "failed"

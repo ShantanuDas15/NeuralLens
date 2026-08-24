@@ -58,13 +58,14 @@ const Dashboard = () => {
     setAppState('preview');
   };
 
-  const handleEnhance = async () => {
+  const handleEnhance = async (scale) => {
     if (!selectedFile) return;
 
     setAppState('uploading');
     
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('scale', scale);
     
     abortControllerRef.current = new AbortController();
 

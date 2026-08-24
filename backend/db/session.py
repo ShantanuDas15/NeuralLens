@@ -101,28 +101,52 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("All SQLite database tables created (or already exist).")
 
-    # Seed the default Real-ESRGAN model config
+    # Seed the default Real-ESRGAN model configs
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(ModelConfig))
-        existing = result.scalars().first()
+        existing_models = result.scalars().all()
+        existing_scales = {m.scale_factor for m in existing_models}
 
-        if existing is None:
-            seed = ModelConfig(
-                id=str(uuid.uuid4()),
-                name="real-esrgan-x4plus",
-                version="1.0.0",
-                scale_factor=4,
-                weights_filename="RealESRGAN_x4plus.pth",
-                is_active=True,
-                description=(
-                    "Default 4× upscaling model. "
-                    "General purpose photorealistic super-resolution."
-                ),
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
-            )
-            session.add(seed)
+        models_to_seed = [
+            {
+                "name": "real-esrgan-x2plus",
+                "scale_factor": 2,
+                "weights_filename": "RealESRGAN_x2plus.pth",
+                "description": "2× upscaling model. Fast, good for large inputs.",
+            },
+            {
+                "name": "real-esrgan-x4plus",
+                "scale_factor": 4,
+                "weights_filename": "RealESRGAN_x4plus.pth",
+                "description": "Default 4× upscaling model. General purpose photorealistic super-resolution.",
+            },
+            {
+                "name": "real-esrgan-x8",
+                "scale_factor": 8,
+                "weights_filename": "RealESRGAN_x4plus.pth",
+                "description": "8× upscaling model. For extreme upscaling.",
+            },
+        ]
+
+        added_any = False
+        for m in models_to_seed:
+            if m["scale_factor"] not in existing_scales:
+                seed = ModelConfig(
+                    id=str(uuid.uuid4()),
+                    name=m["name"],
+                    version="1.0.0",
+                    scale_factor=m["scale_factor"],
+                    weights_filename=m["weights_filename"],
+                    is_active=True,
+                    description=m["description"],
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                session.add(seed)
+                added_any = True
+
+        if added_any:
             await session.commit()
-            logger.info("Seeded default model config: real-esrgan-x4plus")
+            logger.info("Seeded missing model configs")
         else:
             logger.info("model_configs already seeded — skipping.")

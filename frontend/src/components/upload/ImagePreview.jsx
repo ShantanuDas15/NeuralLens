@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import Button from '../ui/Button';
 import { Sparkles, X } from 'lucide-react';
 import './ImagePreview.css';
 
 const ImagePreview = ({ originalUrl, file, onEnhance, onCancel }) => {
+  const [scale, setScale] = useState(4);
+
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -20,12 +23,28 @@ const ImagePreview = ({ originalUrl, file, onEnhance, onCancel }) => {
         <div className="preview-filename">{file.name}</div>
         <div className="preview-filesize">{formatBytes(file.size)}</div>
       </div>
+      
+      <div className="preview-scale-picker">
+        <span className="scale-label">Upscale Factor:</span>
+        <div className="scale-toggle-group">
+          {[2, 4, 8].map((s) => (
+            <button
+              key={s}
+              className={`scale-btn ${scale === s ? 'active' : ''}`}
+              onClick={() => setScale(s)}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="preview-actions">
         <Button variant="secondary" onClick={onCancel} icon={<X size={18} />}>
           Choose Different
         </Button>
-        <Button variant="primary" onClick={onEnhance} icon={<Sparkles size={18} />}>
-          Enhance This Image
+        <Button variant="primary" onClick={() => onEnhance(scale)} icon={<Sparkles size={18} />}>
+          Enhance {scale}×
         </Button>
       </div>
     </div>
