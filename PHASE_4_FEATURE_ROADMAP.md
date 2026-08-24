@@ -144,7 +144,7 @@ The current Toast system shows a single toast at a time. If multiple events fire
 
 ## Milestone 4.6 — Dark/Light Theme Toggle
 
-**Priority**: 🟢 Low | **Effort**: Low | **Impact**: Medium
+**Priority**: 🟢 Low | **Effort**: Low | **Impact**: Medium | **Status**: ✅ Completed
 
 ### Problem
 The application is hardcoded dark. Some users (especially those using it in bright environments) prefer a light theme.

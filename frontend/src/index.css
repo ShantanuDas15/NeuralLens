@@ -36,6 +36,18 @@
   --shadow-glow: 0 0 32px rgba(124, 58, 237, 0.25);
 }
 
+[data-theme="light"] {
+  --color-bg: #F9FAFB;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F3F4F6;
+  --color-border: #E5E7EB;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
 /* CSS Reset & Base Styles */
 *, *::before, *::after {
   box-sizing: border-box;

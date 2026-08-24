@@ -72,8 +72,10 @@
 
 /* Desktop Profile */
 .navbar-desktop-profile {
-  display: none;
   position: relative;
+  display: none;
+  align-items: center;
+  gap: 1rem;
 }
 
 .profile-btn {
@@ -262,7 +264,24 @@
   .navbar-desktop-links, .navbar-desktop-profile {
     display: flex;
   }
-  .mobile-menu-btn, .mobile-menu {
-    display: none;
+  .mobile-actions, .mobile-menu {
+    display: none !important;
   }
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--color-border);
+  color: var(--color-text-primary);
 }

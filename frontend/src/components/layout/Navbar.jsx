@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Home, History, LogOut, User, Menu, X } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Home, History, LogOut, User, Menu, X, Sun, Moon } from 'lucide-react';
 import './Navbar.css';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -58,8 +60,17 @@ const Navbar = () => {
           </NavLink>
         </div>
 
-        {/* Desktop Profile Dropdown */}
+        {/* Desktop Profile Dropdown & Theme Toggle */}
         <div className="navbar-desktop-profile" ref={dropdownRef}>
+          <button 
+            className="theme-toggle-btn" 
+            onClick={toggleTheme} 
+            aria-label="Toggle theme"
+            title="Toggle Theme"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
           <button className="profile-btn" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
             {user?.photoURL && !imgError ? (
               <img 
@@ -95,14 +106,24 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <button 
-          className="mobile-menu-btn" 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        {/* Mobile Menu Toggle & Theme */}
+        <div className="mobile-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button 
+            className="theme-toggle-btn" 
+            onClick={toggleTheme} 
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          
+          <button 
+            className="mobile-menu-btn" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu */}
