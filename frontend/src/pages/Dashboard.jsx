@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import DropZone from '../components/upload/DropZone';
+import ImagePreview from '../components/upload/ImagePreview';
 import UploadProgress from '../components/upload/UploadProgress';
 import ImageCompare from '../components/compare/ImageCompare';
 import { toast } from '../components/ui/Toast';
 import './Dashboard.css';
 
 const Dashboard = () => {
-  // state: 'idle' | 'uploading' | 'processing' | 'success' | 'error'
   const [appState, setAppState] = useState('idle');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const originalUrlRef = useRef(null);
   const abortControllerRef = useRef(null);
   
   const [timerStart, setTimerStart] = useState(0);
@@ -31,31 +32,39 @@ const Dashboard = () => {
   // Clean up object URL and abort pending request on unmount
   useEffect(() => {
     return () => {
-      if (originalUrlRef.current) {
-        URL.revokeObjectURL(originalUrlRef.current);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
       }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [previewUrl]);
 
   const handleFileSelected = async (file) => {
-    setAppState('uploading');
+    setSelectedFile(file);
     setErrorMsg('');
     setResult(null);
 
     // Clean up previous URL if it exists
-    if (originalUrlRef.current) {
-      URL.revokeObjectURL(originalUrlRef.current);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
     }
 
-    // Create object URL for original image preview in ImageCompare
-    const originalUrl = URL.createObjectURL(file);
-    originalUrlRef.current = originalUrl;
+    // Create object URL for original image preview
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    
+    setAppState('preview');
+  };
 
+  const handleEnhance = async () => {
+    if (!selectedFile) return;
+
+    setAppState('uploading');
+    
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', selectedFile);
     
     abortControllerRef.current = new AbortController();
 
@@ -83,7 +92,7 @@ const Dashboard = () => {
 
       setResult({
         ...response.data,
-        original_url: originalUrl // injecting local preview URL
+        original_url: previewUrl // injecting local preview URL
       });
       setAppState('success');
       toast.success('Image enhanced successfully!');
@@ -111,10 +120,11 @@ const Dashboard = () => {
     setAppState('idle');
     setResult(null);
     setErrorMsg('');
+    setSelectedFile(null);
     setElapsedTime(0);
-    if (originalUrlRef.current) {
-      URL.revokeObjectURL(originalUrlRef.current);
-      originalUrlRef.current = null;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
     }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -138,6 +148,15 @@ const Dashboard = () => {
           <div className="page-enter">
             <DropZone onFileSelected={handleFileSelected} />
           </div>
+        )}
+
+        {appState === 'preview' && (
+          <ImagePreview 
+            originalUrl={previewUrl}
+            file={selectedFile}
+            onEnhance={handleEnhance}
+            onCancel={handleReset}
+          />
         )}
 
         {(appState === 'uploading' || appState === 'processing' || appState === 'error') && (
