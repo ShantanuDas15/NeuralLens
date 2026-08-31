@@ -1,0 +1,141 @@
+.batch-queue-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.batch-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.batch-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.batch-header p {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.2s;
+}
+
+.batch-item:last-child {
+  border-bottom: none;
+}
+
+.batch-item.status-processing {
+  background-color: var(--color-surface-alt);
+}
+
+.batch-item-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: var(--color-surface-alt);
+}
+
+.batch-item-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.batch-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-item-name {
+  font-weight: 500;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-item-error {
+  font-size: 0.8rem;
+  color: var(--color-error);
+  margin-top: 0.25rem;
+}
+
+.batch-item-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-pill);
+}
+
+.status-badge.queued {
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+}
+
+.status-badge.processing {
+  background-color: rgba(124, 58, 237, 0.1);
+  color: var(--color-accent-from);
+}
+
+.status-badge.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.status-badge.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+.batch-actions {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background-color: var(--color-surface-alt);
+}
+
+.batch-btn {
+  width: 100%;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

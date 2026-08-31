@@ -3,42 +3,49 @@ import { UploadCloud, Image as ImageIcon, X } from 'lucide-react';
 import Button from '../ui/Button';
 import './DropZone.css';
 
-const DropZone = ({ onFileSelected }) => {
+const MAX_FILES = 5;
+const MAX_SIZE = 2 * 1024 * 1024;
+
+const DropZone = ({ onFilesSelected, multiple = true }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [error, setError] = useState('');
+  const [scale, setScale] = useState(4);
   const inputRef = useRef(null);
-  
-  const previewUrl = useMemo(() => {
-    return selectedFile ? URL.createObjectURL(selectedFile) : null;
-  }, [selectedFile]);
+
+  const previewUrls = useMemo(() => {
+    return selectedFiles.map(file => URL.createObjectURL(file));
+  }, [selectedFiles]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
-  const validateFile = (file) => {
+  const validateFiles = (files) => {
     setError('');
-    
-    // Check file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setError('Please upload a valid image file (JPEG, PNG, WEBP).');
-      return false;
+    const validFiles = [];
+
+    if (files.length > MAX_FILES) {
+      setError(`You can only upload a maximum of ${MAX_FILES} images at once.`);
+      return [];
     }
 
-    // Check file size (2MB)
-    const MAX_SIZE = 2 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      setError('Image must be less than 2MB.');
-      return false;
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        setError('Please upload only valid image files (JPEG, PNG, WEBP).');
+        return [];
+      }
+      if (file.size > MAX_SIZE) {
+        setError('Each image must be less than 2MB.');
+        return [];
+      }
+      validFiles.push(file);
     }
 
-    return true;
+    return validFiles;
   };
 
   const handleDrag = (e) => {
@@ -56,46 +63,55 @@ const DropZone = ({ onFileSelected }) => {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (validateFile(file)) {
-        setSelectedFile(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesArray = Array.from(e.dataTransfer.files);
+      const validFiles = validateFiles(filesArray);
+      if (validFiles.length > 0) {
+        setSelectedFiles(validFiles);
       }
     }
   };
 
   const handleChange = (e) => {
     e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (validateFile(file)) {
-        setSelectedFile(file);
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArray = Array.from(e.target.files);
+      const validFiles = validateFiles(filesArray);
+      if (validFiles.length > 0) {
+        setSelectedFiles(validFiles);
       }
     }
   };
 
-  const clearFile = (e) => {
+  const removeFile = (e, indexToRemove) => {
     e.stopPropagation();
-    setSelectedFile(null);
+    setSelectedFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    setError('');
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const clearAllFiles = (e) => {
+    e.stopPropagation();
+    setSelectedFiles([]);
     setError('');
     if (inputRef.current) inputRef.current.value = '';
   };
 
   const handleUpload = () => {
-    if (selectedFile) {
-      onFileSelected(selectedFile);
+    if (selectedFiles.length > 0) {
+      onFilesSelected(selectedFiles, scale);
     }
   };
 
   return (
     <div className="dropzone-container">
       <div 
-        className={`dropzone-area ${dragActive ? 'drag-active' : ''} ${selectedFile ? 'has-file' : ''}`}
+        className={`dropzone-area ${dragActive ? 'drag-active' : ''} ${selectedFiles.length > 0 ? 'has-file' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        onClick={() => !selectedFile && inputRef.current?.click()}
+        onClick={() => selectedFiles.length === 0 && inputRef.current?.click()}
       >
         <input 
           ref={inputRef}
@@ -103,35 +119,43 @@ const DropZone = ({ onFileSelected }) => {
           accept="image/jpeg, image/png, image/webp" 
           onChange={handleChange} 
           className="dropzone-input"
+          multiple={multiple}
         />
 
-        {selectedFile ? (
-          <div className="dropzone-preview">
-            <div className="preview-image-container">
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
-                className="preview-image"
-              />
-              <button className="clear-btn" onClick={clearFile} aria-label="Remove image">
-                <X size={16} />
-              </button>
+        {selectedFiles.length > 0 ? (
+          <div className="dropzone-previews">
+            <div className="preview-grid">
+              {selectedFiles.map((file, idx) => (
+                <div key={idx} className="preview-image-container">
+                  <img 
+                    src={previewUrls[idx]} 
+                    alt={`Preview ${idx + 1}`} 
+                    className="preview-image"
+                  />
+                  <button className="clear-btn" onClick={(e) => removeFile(e, idx)} aria-label="Remove image">
+                    <X size={14} />
+                  </button>
+                  <div className="file-info-mini">
+                    <span className="file-name">{file.name}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="file-info">
-              <ImageIcon size={18} className="file-icon" />
-              <span className="file-name">{selectedFile.name}</span>
-              <span className="file-size">({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-            </div>
+            {selectedFiles.length > 1 && (
+               <button className="clear-all-btn" onClick={clearAllFiles}>
+                 Clear All
+               </button>
+            )}
           </div>
         ) : (
           <div className="dropzone-prompt">
             <div className="dropzone-icon-wrapper">
               <UploadCloud size={48} />
             </div>
-            <h3>Drop your image here</h3>
+            <h3>Drop your image{multiple ? 's' : ''} here</h3>
             <p>or click to browse from your device</p>
             <div className="dropzone-limits">
-              Supports JPEG, PNG, WEBP (Max 2MB)
+              Supports JPEG, PNG, WEBP (Max 2MB per file, up to {MAX_FILES} files)
             </div>
           </div>
         )}
@@ -140,14 +164,30 @@ const DropZone = ({ onFileSelected }) => {
       {error && <div className="dropzone-error">{error}</div>}
 
       <div className="dropzone-actions">
+        {selectedFiles.length > 1 && (
+          <div className="batch-scale-picker">
+            <span className="scale-label">Scale:</span>
+            <div className="scale-toggle-group">
+              {[2, 4].map((s) => (
+                <button
+                  key={s}
+                  className={`scale-btn ${scale === s ? 'active' : ''}`}
+                  onClick={() => setScale(s)}
+                >
+                  {s}×
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Button 
           variant="primary" 
           size="lg" 
-          disabled={!selectedFile}
+          disabled={selectedFiles.length === 0}
           onClick={handleUpload}
           className="upload-submit-btn"
         >
-          Enhance Image
+          {selectedFiles.length > 1 ? `Enhance ${selectedFiles.length} Images` : 'Enhance Image'}
         </Button>
       </div>
     </div>

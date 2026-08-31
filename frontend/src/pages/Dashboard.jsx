@@ -4,21 +4,31 @@ import DropZone from '../components/upload/DropZone';
 import ImagePreview from '../components/upload/ImagePreview';
 import UploadProgress from '../components/upload/UploadProgress';
 import ImageCompare from '../components/compare/ImageCompare';
+import BatchQueue from '../components/upload/BatchQueue';
 import { toast } from '../components/ui/Toast';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const [appState, setAppState] = useState('idle');
+  
+  // Single file state
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const abortControllerRef = useRef(null);
-  
   const [timerStart, setTimerStart] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  // Timer logic for processing state
+  // Batch files state
+  const [batchFiles, setBatchFiles] = useState([]);
+  const [batchPreviewUrls, setBatchPreviewUrls] = useState([]);
+  const [batchStatuses, setBatchStatuses] = useState([]);
+  const [batchResults, setBatchResults] = useState([]);
+  const [batchErrors, setBatchErrors] = useState([]);
+
+  const abortControllerRef = useRef(null);
+
+  // Timer logic for single processing state
   useEffect(() => {
     let interval;
     if (appState === 'processing') {
@@ -29,36 +39,108 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [appState, timerStart]);
 
-  // Clean up object URL and abort pending request on unmount
+  // Clean up object URLs and abort pending request on unmount
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      batchPreviewUrls.forEach(url => URL.revokeObjectURL(url));
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [previewUrl]);
+  }, [previewUrl, batchPreviewUrls]);
 
-  const handleFileSelected = async (file) => {
-    setSelectedFile(file);
+  const handleFilesSelected = (files, batchScale) => {
     setErrorMsg('');
     setResult(null);
 
-    // Clean up previous URL if it exists
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    batchPreviewUrls.forEach(url => URL.revokeObjectURL(url));
 
-    // Create object URL for original image preview
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    
-    setAppState('preview');
+    if (files.length === 1) {
+      const file = files[0];
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      setAppState('preview');
+    } else {
+      setBatchFiles(files);
+      setBatchPreviewUrls(files.map(f => URL.createObjectURL(f)));
+      setBatchStatuses(new Array(files.length).fill('queued'));
+      setBatchResults(new Array(files.length).fill(null));
+      setBatchErrors(new Array(files.length).fill(''));
+      setAppState('batch');
+      startBatchProcessing(files, batchScale);
+    }
   };
 
-  const handleEnhance = async (scale) => {
+  const startBatchProcessing = async (files, scale) => {
+    const statuses = new Array(files.length).fill('queued');
+    const results = new Array(files.length).fill(null);
+    const errors = new Array(files.length).fill('');
+    
+    abortControllerRef.current = new AbortController();
+    
+    const toastId = toast.loading(`Batch processing ${files.length} images...`);
+
+    for (let i = 0; i < files.length; i++) {
+      // Check if aborted
+      if (abortControllerRef.current.signal.aborted) {
+        toast.dismiss(toastId);
+        break;
+      }
+
+      statuses[i] = 'processing';
+      setBatchStatuses([...statuses]);
+
+      const formData = new FormData();
+      formData.append('file', files[i]);
+      formData.append('scale', scale);
+
+      try {
+        const response = await api.post('/enhance', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal: abortControllerRef.current.signal
+        });
+
+        results[i] = {
+          ...response.data,
+          original_url: URL.createObjectURL(files[i])
+        };
+        statuses[i] = 'success';
+        
+      } catch (err) {
+        if (err.name === 'CanceledError' || err.message === 'canceled') {
+          statuses[i] = 'queued';
+          break;
+        }
+        
+        statuses[i] = 'error';
+        let msg = 'Error';
+        if (err.response) {
+          if (err.response.status === 413) msg = 'Too large';
+          else if (err.response.status === 429) msg = 'Rate limit';
+          else msg = err.response.data?.detail || 'Failed';
+        }
+        errors[i] = msg;
+      }
+      
+      setBatchResults([...results]);
+      setBatchStatuses([...statuses]);
+      setBatchErrors([...errors]);
+    }
+    
+    if (!abortControllerRef.current.signal.aborted) {
+      toast.dismiss(toastId);
+      const successCount = statuses.filter(s => s === 'success').length;
+      if (successCount > 0) {
+        toast.success(`Completed! ${successCount}/${files.length} images enhanced.`);
+      } else {
+        toast.error('Batch processing failed.');
+      }
+    }
+  };
+
+  const handleEnhanceSingle = async (scale) => {
     if (!selectedFile) return;
 
     setAppState('uploading');
@@ -71,21 +153,16 @@ const Dashboard = () => {
     const toastId = toast.loading(`Processing image at ${scale}x scale...`);
 
     try {
-      // Small artificial delay to show uploading state briefly
       await new Promise(r => setTimeout(r, 600));
-      
       setAppState('processing');
       const startMs = Date.now();
       setTimerStart(startMs);
 
       const response = await api.post('/enhance', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
         signal: abortControllerRef.current.signal
       });
 
-      // Artificial minimum processing time (to show cool animation)
       const minTimeMs = 1500;
       const actualTimeMs = Date.now() - startMs;
       if (actualTimeMs < minTimeMs) {
@@ -94,7 +171,7 @@ const Dashboard = () => {
 
       setResult({
         ...response.data,
-        original_url: previewUrl // injecting local preview URL
+        original_url: previewUrl
       });
       setAppState('success');
       toast.dismiss(toastId);
@@ -104,10 +181,8 @@ const Dashboard = () => {
       toast.dismiss(toastId);
       if (err.name === 'CanceledError' || err.message === 'canceled') {
         toast.info('Enhancement cancelled');
-        if (import.meta.env.DEV) console.log('Upload canceled');
         return;
       }
-      if (import.meta.env.DEV) console.error("Enhancement failed:", err);
       let msg = 'An unexpected error occurred.';
       if (err.response) {
         if (err.response.status === 413) msg = 'File is too large (Max 2MB).';
@@ -122,19 +197,25 @@ const Dashboard = () => {
   };
 
   const handleReset = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setAppState('idle');
     setResult(null);
     setErrorMsg('');
     setSelectedFile(null);
     setElapsedTime(0);
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
+    setBatchFiles([]);
+    setBatchStatuses([]);
+    setBatchResults([]);
+    setBatchErrors([]);
+    
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    
+    batchPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setBatchPreviewUrls([]);
   };
 
   return (
@@ -151,7 +232,7 @@ const Dashboard = () => {
       <div className="dashboard-content">
         {appState === 'idle' && (
           <div className="page-enter">
-            <DropZone onFileSelected={handleFileSelected} />
+            <DropZone onFilesSelected={handleFilesSelected} />
           </div>
         )}
 
@@ -159,7 +240,7 @@ const Dashboard = () => {
           <ImagePreview 
             originalUrl={previewUrl}
             file={selectedFile}
-            onEnhance={handleEnhance}
+            onEnhance={handleEnhanceSingle}
             onCancel={handleReset}
           />
         )}
@@ -175,6 +256,17 @@ const Dashboard = () => {
 
         {appState === 'success' && result && (
           <ImageCompare result={result} onReset={handleReset} />
+        )}
+
+        {appState === 'batch' && (
+          <BatchQueue 
+            files={batchFiles}
+            previewUrls={batchPreviewUrls}
+            results={batchResults}
+            statuses={batchStatuses}
+            errors={batchErrors}
+            onReset={handleReset}
+          />
         )}
       </div>
     </div>

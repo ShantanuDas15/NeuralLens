@@ -177,7 +177,7 @@ The application is hardcoded dark. Some users (especially those using it in brig
 
 ## Milestone 4.7 — Batch Processing (Multi-Upload)
 
-**Priority**: 🟢 Low | **Effort**: High | **Impact**: Very High
+**Priority**: 🟢 Low | **Effort**: High | **Impact**: Very High | **Status**: ✅ Completed
 
 ### Problem
 Power users want to enhance multiple images without going through the upload-wait-download cycle repeatedly.
@@ -190,12 +190,10 @@ Power users want to enhance multiple images without going through the upload-wai
 ### Implementation Plan
 
 #### Backend
-- The `/api/enhance` endpoint is already designed for one file. For batch, create a new `POST /api/enhance/batch` that accepts `files: list[UploadFile]`.
-- Process each file sequentially (respecting the existing `inference_semaphore`) and return an array of job responses.
-
-#### Frontend
-- Refactor `DropZone` to accept `multiple` prop.
-- New `<BatchQueue />` component renders the queue list with individual progress per file.
+- [x] **Backend**: Create `POST /api/enhance/batch` accepting `list[UploadFile]`. Process sequentially respecting `inference_semaphore`.
+- [x] **Frontend**: Dropzone updates (`multiple=true`), Job queue UI (queued -> processing -> done).
+- [x] **Frontend**: "Download All" as ZIP (use `jszip`).
+  - *Status*: **Completed** - Implemented a frontend-orchestrated batch queue (using `BatchQueue.jsx`) that sequentially calls `/api/enhance`, providing real-time UI updates, with JSZip download capability.
 
 ---
 
