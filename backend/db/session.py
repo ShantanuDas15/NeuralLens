@@ -81,6 +81,27 @@ async def get_db():
             await session.close()
 
 
+async def fail_interrupted_jobs(reason: str) -> int:
+    """Mark jobs still pending/processing as failed; return how many.
+
+    The service runs a single process with an in-process inference slot, so at
+    startup or shutdown any such job was interrupted (crash, OOM kill, redeploy)
+    and would otherwise stay "processing" forever.
+    """
+    from sqlalchemy import update  # noqa: PLC0415
+
+    from models.database import EnhancementJob  # noqa: PLC0415
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            update(EnhancementJob)
+            .where(EnhancementJob.status.in_(["pending", "processing"]))
+            .values(status="failed", error_message=reason)
+        )
+        await session.commit()
+        return result.rowcount or 0
+
+
 async def init_db() -> None:
     """Create all tables and seed the model_configs table.
 

@@ -76,6 +76,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     logger.info("Database initialised.")
 
+    from db.session import fail_interrupted_jobs  # noqa: PLC0415
+
+    stale = await fail_interrupted_jobs("Interrupted by a server restart.")
+    if stale:
+        logger.warning("Marked %d interrupted job(s) as failed.", stale)
+
     # 3. Initialise Firebase Admin SDK
     #    Wrapped in try/except so the server still starts if the service
     #    account file is missing (useful for running unit tests without creds).
@@ -96,6 +102,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Firebase Admin SDK initialised.")
     except Exception as exc:  # noqa: BLE001
         logger.warning("Firebase Admin SDK not initialised: %s", exc)
+
+    if settings.require_firebase:
+        import firebase_admin  # noqa: PLC0415
+
+        if not firebase_admin._apps:
+            raise RuntimeError(
+                "REQUIRE_FIREBASE is set but Firebase Admin SDK is not initialised."
+            )
 
     # 4. Load SRGAN model singleton
     #    Also deferred — skipped gracefully if weights are absent.
@@ -121,7 +135,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ---- SHUTDOWN ----------------------------------------------------------
     logger.info("NeuralLens backend shutting down.")
-    from db.session import engine  # noqa: PLC0415
+    from db.session import engine, fail_interrupted_jobs  # noqa: PLC0415
+
+    # uvicorn has already waited for in-flight requests (up to its graceful
+    # timeout); anything still unfinished will never complete.
+    try:
+        left = await fail_interrupted_jobs("Interrupted by server shutdown.")
+        if left:
+            logger.warning("Marked %d unfinished job(s) as failed.", left)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not clean up unfinished jobs: %s", exc)
 
     await engine.dispose()
 
@@ -210,7 +233,7 @@ async def health_check() -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Readiness check — verifies the DB and the model, returns 503 otherwise
+# Readiness check — verifies DB, model and Firebase; returns 503 otherwise
 # ---------------------------------------------------------------------------
 @app.get("/ready", tags=["health"], summary="Readiness check")
 async def readiness_check() -> JSONResponse:
@@ -220,7 +243,12 @@ async def readiness_check() -> JSONResponse:
     from db.session import engine  # noqa: PLC0415
     from services.srgan import is_loaded  # noqa: PLC0415
 
-    checks: dict[str, bool] = {"model": is_loaded()}
+    import firebase_admin  # noqa: PLC0415
+
+    checks: dict[str, bool] = {
+        "model": is_loaded(),
+        "firebase": bool(firebase_admin._apps),
+    }
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))

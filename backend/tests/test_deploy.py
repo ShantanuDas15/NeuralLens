@@ -52,11 +52,41 @@ def test_ready_200_when_model_loaded(monkeypatch):
     import services.srgan as srgan
     from main import app
 
+    import firebase_admin
+
     with TestClient(app) as client:
         monkeypatch.setattr(srgan, "_model_instances", {4: object()})
+        monkeypatch.setattr(firebase_admin, "_apps", {"[DEFAULT]": object()})
         resp = client.get("/ready")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ready"
+
+
+def test_ready_503_when_firebase_not_initialised(monkeypatch):
+    import firebase_admin
+
+    import services.srgan as srgan
+    from main import app
+
+    with TestClient(app) as client:
+        monkeypatch.setattr(srgan, "_model_instances", {4: object()})
+        monkeypatch.setattr(firebase_admin, "_apps", {})
+        resp = client.get("/ready")
+    assert resp.status_code == 503
+    assert resp.json()["checks"]["firebase"] is False
+
+
+def test_require_firebase_fails_startup(monkeypatch):
+    import firebase_admin
+
+    from config import settings
+    from main import app
+
+    monkeypatch.setattr(settings, "require_firebase", True)
+    monkeypatch.setattr(firebase_admin, "_apps", {})
+    with pytest.raises(RuntimeError, match="REQUIRE_FIREBASE"):
+        with TestClient(app):
+            pass
 
 
 def test_alembic_upgrade_and_downgrade(tmp_path):

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -32,6 +33,28 @@ router = APIRouter(prefix="/enhance", tags=["enhance"])
 
 # Max concurrent inferences (prevents OOM on GPU/CPU)
 inference_semaphore = asyncio.Semaphore(1)
+
+# Jobs admitted (running + waiting for the inference slot). Single-threaded
+# asyncio, so check-then-increment below needs no lock.
+_in_flight = 0
+
+
+@contextmanager
+def _admission():
+    """Reject new work with 503 once too many jobs are already queued."""
+    global _in_flight
+    if _in_flight >= settings.max_pending_jobs:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Server is busy. Please retry shortly.",
+            headers={"Retry-After": "30"},
+        )
+    _in_flight += 1
+    try:
+        yield
+    finally:
+        _in_flight -= 1
+
 
 _EXT_FOR_FORMAT = {"JPEG": ".jpg", "PNG": ".png"}
 _READ_CHUNK = 64 * 1024
@@ -140,6 +163,25 @@ async def create_enhancement_job(
             detail=f"Output at {scale}x would be too large. Try a smaller image or scale.",
         )
 
+    with _admission():
+        return await _process_job(
+            request, db, current_user, file.filename,
+            input_bytes, img_format, input_w, input_h, scale,
+        )
+
+
+async def _process_job(
+    request: Request,
+    db: AsyncSession,
+    current_user: User,
+    filename: str,
+    input_bytes: bytes,
+    img_format: str,
+    input_w: int,
+    input_h: int,
+    scale: int,
+) -> EnhancementJobResponse:
+    """Create the job row, run inference and persist the result."""
     ext = _EXT_FOR_FORMAT[img_format]
 
     model_config_result = await db.execute(
@@ -159,7 +201,7 @@ async def create_enhancement_job(
         id=job_id,
         user_id=current_user.id,
         model_config_id=model_config.id,
-        original_filename=file.filename,
+        original_filename=filename,
         input_file_path=str(input_filepath),
         input_size_bytes=len(input_bytes),
         input_width=input_w,

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
 
     # Fail startup (instead of only warning) if model weights are missing.
     require_model: bool = False
+    # Fail startup if Firebase Admin could not be initialised (else every login fails).
+    require_firebase: bool = False
+    # Jobs allowed in the system at once (1 running + the rest waiting for the slot).
+    max_pending_jobs: int = 4
 
     # File storage
     upload_dir: str = "uploads"

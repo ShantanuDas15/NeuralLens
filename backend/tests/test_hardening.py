@@ -202,3 +202,57 @@ async def test_delete_history_removes_files(client):
 
 def test_readiness_and_liveness_still_work(client):
     assert client.get("/health").status_code == 200
+
+
+def test_queue_depth_cap_returns_503(client, monkeypatch):
+    from routers import enhance
+
+    monkeypatch.setattr(enhance.settings, "max_pending_jobs", 1)
+    monkeypatch.setattr(enhance, "_in_flight", 1)  # one job already admitted
+    resp = _post(client, _png(4, 4))
+    assert resp.status_code == 503
+    assert resp.headers.get("retry-after")
+
+
+@pytest.mark.asyncio
+async def test_rejected_by_queue_cap_creates_no_job(client, monkeypatch):
+    from routers import enhance
+
+    monkeypatch.setattr(enhance.settings, "max_pending_jobs", 1)
+    monkeypatch.setattr(enhance, "_in_flight", 1)
+    _post(client, _png(4, 4))
+    assert await _jobs() == []
+
+
+def test_in_flight_counter_released(client):
+    from routers import enhance
+
+    before = enhance._in_flight
+    with patch("routers.enhance.enhance_image", side_effect=_ok_result):
+        assert _post(client, _png(4, 4)).status_code == 200
+    with patch("routers.enhance.enhance_image", side_effect=RuntimeError("boom")):
+        assert _post(client, _png(4, 4)).status_code == 500
+    assert enhance._in_flight == before
+
+
+@pytest.mark.asyncio
+async def test_fail_interrupted_jobs(client):
+    from db.session import AsyncSessionLocal, fail_interrupted_jobs
+
+    with patch("routers.enhance.enhance_image", side_effect=_ok_result):
+        _post(client, _png(4, 4))  # one completed job
+        _post(client, _png(4, 4))
+    async with AsyncSessionLocal() as session:
+        jobs = (await session.execute(select(EnhancementJob))).scalars().all()
+        jobs[0].status = "processing"
+        jobs[1].status = "pending"
+        extra = jobs[1].id
+        await session.commit()
+
+    assert await fail_interrupted_jobs("restart") == 2
+    assert await fail_interrupted_jobs("restart") == 0  # idempotent
+    async with AsyncSessionLocal() as session:
+        for job in (await session.execute(select(EnhancementJob))).scalars():
+            assert job.status == "failed"
+            assert job.error_message == "restart"
+        assert extra
