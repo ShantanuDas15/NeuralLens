@@ -19,4 +19,16 @@ api.interceptors.request.use(
   }
 );
 
+/**
+ * Fetch a backend image (e.g. "/api/results/<id>.png") as a Blob.
+ *
+ * These endpoints require the Firebase Bearer token, which a plain <img src>
+ * or fetch() cannot send, so images are loaded through the authenticated
+ * client (which also honours VITE_API_URL).
+ */
+export const fetchImageBlob = async (url) => {
+  const { data } = await api.get(url.replace(/^\/api/, ''), { responseType: 'blob' });
+  return data;
+};
+
 export default api;

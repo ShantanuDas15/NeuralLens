@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import Button from '../ui/Button';
+import AuthedImage from '../ui/AuthedImage';
+import { fetchImageBlob } from '../../api';
 import './ImageCompare.css';
 
 const ImageCompare = ({ result, onReset }) => {
@@ -68,8 +70,7 @@ const ImageCompare = ({ result, onReset }) => {
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(result.result_url);
-      const blob = await response.blob();
+      const blob = await fetchImageBlob(result.result_url);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -92,7 +93,7 @@ const ImageCompare = ({ result, onReset }) => {
         onTouchStart={startDrag}
       >
         {/* Right Image (Enhanced) - Base layer */}
-        <img 
+        <AuthedImage 
           src={result.result_url} 
           alt="Enhanced" 
           className="compare-img compare-enhanced" 

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, ExternalLink, RefreshCw, AlertCircle, Trash2, RotateCcw, Columns } from 'lucide-react';
-import api from '../api';
+import api, { fetchImageBlob } from '../api';
 import useApi from '../hooks/useApi';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
+import AuthedImage from '../components/ui/AuthedImage';
 import { toast } from '../components/ui/Toast';
 import HistoryCardSkeleton from '../components/history/HistoryCardSkeleton';
 import ImageCompare from '../components/compare/ImageCompare';
@@ -24,11 +25,26 @@ const History = () => {
     execute(() => api.get(`/history?page=${page}&page_size=${pageSize}`)).catch(() => {});
   }, [page, execute]);
 
+  const handleViewFull = async (url) => {
+    if (!url) return;
+    // Open the tab synchronously (inside the click) so popup blockers allow it.
+    const win = window.open('', '_blank');
+    try {
+      const blob = await fetchImageBlob(url);
+      const objUrl = window.URL.createObjectURL(blob);
+      if (win) win.location.href = objUrl;
+      setTimeout(() => window.URL.revokeObjectURL(objUrl), 60000);
+    } catch (err) {
+      win?.close();
+      if (import.meta.env.DEV) console.error('Open image failed:', err);
+      toast.error('Failed to open image');
+    }
+  };
+
   const handleDownload = async (url, id) => {
     if (!url) return;
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
+      const blob = await fetchImageBlob(url);
       const objUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objUrl;
@@ -132,7 +148,7 @@ const History = () => {
               <div key={job.job_id} className="history-card">
                 <div className="history-card-image-wrapper">
                   {job.status === 'completed' && job.result_url ? (
-                    <img 
+                    <AuthedImage 
                       src={job.result_url} 
                       alt={job.original_filename} 
                       className="history-card-image" 
@@ -155,17 +171,16 @@ const History = () => {
                     >
                       <Download size={16} />
                     </Button>
-                    <a 
-                      href={job.result_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                    <button 
+                      type="button"
                       className={`btn btn-sm btn-ghost ${job.status !== 'completed' ? 'disabled' : ''}`}
-                      onClick={(e) => job.status !== 'completed' && e.preventDefault()}
+                      disabled={job.status !== 'completed'}
+                      onClick={() => handleViewFull(job.result_url)}
                       aria-label="View Original"
                       title="View Full Size"
                     >
                       <ExternalLink size={16} />
-                    </a>
+                    </button>
                     <Button 
                       size="sm" 
                       variant="secondary" 

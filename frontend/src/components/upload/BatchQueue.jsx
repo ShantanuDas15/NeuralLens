@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, Loader2, AlertCircle, Download } from 'lucide-react';
 import JSZip from 'jszip';
 import Button from '../ui/Button';
+import { fetchImageBlob } from '../../api';
 import './BatchQueue.css';
 
 const BatchQueue = ({ files, previewUrls, results, statuses, errors, onReset }) => {
@@ -17,8 +18,7 @@ const BatchQueue = ({ files, previewUrls, results, statuses, errors, onReset }) 
       
       const promises = results.map(async (result, idx) => {
         if (!result) return;
-        const response = await fetch(result.result_url);
-        const blob = await response.blob();
+        const blob = await fetchImageBlob(result.result_url);
         
         // Generate a filename based on original file
         const originalName = files[idx].name;
