@@ -24,8 +24,12 @@ RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
 # Copy the backend code
 COPY . .
 
+# Bake the model weights into the image (they are not in git).
+RUN python scripts/download_weights.py
+
 # Expose the application port
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# start.sh runs `alembic upgrade head`, then uvicorn on $PORT (default 8000)
+CMD ["./start.sh"]

@@ -76,11 +76,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     #    Wrapped in try/except so the server still starts if the service
     #    account file is missing (useful for running unit tests without creds).
     try:
+        import json  # noqa: PLC0415
+
         import firebase_admin  # noqa: PLC0415
         from firebase_admin import credentials  # noqa: PLC0415
 
         if not firebase_admin._apps:  # avoid re-initialising in tests
-            cred = credentials.Certificate(settings.firebase_service_account_path)
+            if settings.firebase_service_account_json:
+                cred = credentials.Certificate(
+                    json.loads(settings.firebase_service_account_json)
+                )
+            else:
+                cred = credentials.Certificate(settings.firebase_service_account_path)
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialised.")
     except Exception as exc:  # noqa: BLE001
@@ -95,6 +102,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("SRGAN model loaded.")
     except Exception as exc:  # noqa: BLE001
         logger.warning("SRGAN model could not be loaded at startup: %s", exc)
+        if settings.require_model:
+            raise
+
+    if settings.require_model:
+        from services.srgan import is_loaded  # noqa: PLC0415
+
+        if not is_loaded():
+            raise RuntimeError(
+                "REQUIRE_MODEL is set but no SRGAN weights were loaded."
+            )
 
     yield  # ---- Application runs here ----
 
@@ -183,3 +200,30 @@ async def health_check() -> dict[str, str]:
     No authentication required.
     """
     return {"status": "ok", "version": settings.app_version}
+
+
+# ---------------------------------------------------------------------------
+# Readiness check — verifies the DB and the model, returns 503 otherwise
+# ---------------------------------------------------------------------------
+@app.get("/ready", tags=["health"], summary="Readiness check")
+async def readiness_check() -> JSONResponse:
+    """Report whether the service can actually serve enhancement requests."""
+    from sqlalchemy import text  # noqa: PLC0415
+
+    from db.session import engine  # noqa: PLC0415
+    from services.srgan import is_loaded  # noqa: PLC0415
+
+    checks: dict[str, bool] = {"model": is_loaded()}
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Readiness DB check failed: %s", exc)
+        checks["database"] = False
+
+    ok = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ok else 503,
+        content={"status": "ready" if ok else "unavailable", "checks": checks},
+    )

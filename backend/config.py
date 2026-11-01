@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -17,10 +18,16 @@ class Settings(BaseSettings):
 
     # Firebase
     firebase_project_id: str
-    firebase_service_account_path: str
+    # Either a path to the service-account JSON file, or the JSON itself
+    # (e.g. a Railway variable). The JSON variant wins if both are set.
+    firebase_service_account_path: str = ""
+    firebase_service_account_json: str = ""
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./neurallens.db"
+
+    # Fail startup (instead of only warning) if model weights are missing.
+    require_model: bool = False
 
     # File storage
     upload_dir: str = "uploads"
@@ -33,6 +40,15 @@ class Settings(BaseSettings):
     # Application
     app_version: str = "1.0.0"
     debug: bool = False
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalise_database_url(cls, v: str) -> str:
+        """Accept provider-style Postgres URLs and force the asyncpg driver."""
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+asyncpg://" + v[len(prefix):]
+        return v
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

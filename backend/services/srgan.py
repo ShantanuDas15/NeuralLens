@@ -38,6 +38,11 @@ _model_instances: dict[int, RealESRGANer] = {}
 _WEIGHTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "weights")
 
 
+def is_loaded() -> bool:
+    """Return True if at least one model has been loaded."""
+    return bool(_model_instances)
+
+
 def load_model() -> None:
     """Initialize and load the RealESRGANer models into memory."""
     global _model_instances

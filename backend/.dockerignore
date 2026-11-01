@@ -1,0 +1,16 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+*.db
+.env
+.env.*
+!.env.example
+uploads/
+results/
+weights/*.pth
+tests/
+serviceAccountKey.json
+firebase-service-account.json
