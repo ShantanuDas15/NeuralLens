@@ -102,5 +102,6 @@ async def get_input_image(
         )
 
     # Assuming format is something like 'JPEG' or 'PNG', mapping to media type
-    media_type = f"image/{job.input_format.lower()}"
+    fmt = job.input_format.lower()
+    media_type = "image/jpeg" if fmt in ("jpg", "jpeg") else f"image/{fmt}"
     return FileResponse(path=input_filepath, media_type=media_type)

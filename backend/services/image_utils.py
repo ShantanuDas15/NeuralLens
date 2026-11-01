@@ -8,8 +8,33 @@ Provides preprocessing and postprocessing functions for image enhancement:
 
 from __future__ import annotations
 
+from io import BytesIO
+
 import cv2
 import numpy as np
+from PIL import Image, UnidentifiedImageError
+
+ALLOWED_FORMATS = {"JPEG", "PNG"}
+
+
+def inspect_image(raw_bytes: bytes) -> tuple[str, int, int]:
+    """Read only the image header: return (format, width, height).
+
+    Does not decode pixel data, so it is cheap and safe to call before the
+    pixel-count limits are enforced.
+
+    Raises:
+        ValueError: If the bytes are not a readable JPEG or PNG.
+    """
+    try:
+        with Image.open(BytesIO(raw_bytes)) as img:
+            fmt, (width, height) = img.format, img.size
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+        raise ValueError("Invalid, corrupt, or unsupported image format.") from exc
+
+    if fmt not in ALLOWED_FORMATS:
+        raise ValueError("Unsupported file format. Only JPEG and PNG are allowed.")
+    return fmt, width, height
 
 
 def validate_and_decode(raw_bytes: bytes, max_bytes: int) -> np.ndarray:

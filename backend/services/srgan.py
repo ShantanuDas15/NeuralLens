@@ -31,6 +31,14 @@ from services.image_utils import encode_to_png, validate_and_decode
 
 logger = logging.getLogger(__name__)
 
+class InferenceOOMError(RuntimeError):
+    """Raised when inference runs out of (GPU or host) memory."""
+
+
+def _is_oom(exc: BaseException) -> bool:
+    return isinstance(exc, MemoryError) or "out of memory" in str(exc).lower()
+
+
 # Module-level dictionary to hold the loaded models
 _model_instances: dict[int, RealESRGANer] = {}
 
@@ -78,7 +86,7 @@ def load_model() -> None:
             scale=cfg["model_scale"],
             model_path=weights_path,
             model=model,
-            tile=0,
+            tile=settings.tile_size,
             tile_pad=10,
             pre_pad=0,
             half=device == "cuda",
@@ -130,6 +138,11 @@ def enhance_image(input_bytes: bytes, scale: int = 4) -> tuple[bytes, dict[str, 
     try:
         out_bgr, _ = model_instance.enhance(img_bgr, outscale=scale)
     except Exception as exc:
+        if _is_oom(exc):
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            logger.error("Inference ran out of memory: %s", exc)
+            raise InferenceOOMError("Image too large for available memory.") from exc
         logger.error("Inference failed: %s", exc, exc_info=True)
         raise RuntimeError("Model inference failed.") from exc
 

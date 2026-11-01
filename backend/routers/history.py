@@ -1,5 +1,6 @@
 """Router for the job history endpoint."""
 
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
@@ -103,6 +104,15 @@ async def delete_history_job(
 
     # Soft delete
     job.deleted_at = datetime.now(timezone.utc)
+    paths = [job.input_file_path, job.output_file_path]
     await db.commit()
+
+    # The user asked for this job to be removed: free the disk space too.
+    for raw in paths:
+        if raw:
+            try:
+                Path(raw).unlink(missing_ok=True)
+            except OSError:
+                pass
     
     return None

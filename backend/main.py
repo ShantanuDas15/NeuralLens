@@ -44,6 +44,10 @@ structlog.configure(
     cache_logger_on_first_use=True,
 )
 
+# structlog renders to stdlib handlers; without a configured root logger the
+# INFO records from stdlib-logging modules (srgan, enhance, auth) are dropped.
+logging.basicConfig(format="%(message)s", level=logging.INFO)
+
 # Replace the default logger with structlog
 logger = structlog.get_logger(__name__)
 
@@ -117,6 +121,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ---- SHUTDOWN ----------------------------------------------------------
     logger.info("NeuralLens backend shutting down.")
+    from db.session import engine  # noqa: PLC0415
+
+    await engine.dispose()
 
 
 # ---------------------------------------------------------------------------

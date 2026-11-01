@@ -2,23 +2,29 @@
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from db.session import get_db
 from middleware.auth import get_current_user
 from middleware.rate_limit import limiter
-from models.database import AuditLog, EnhancementJob, User, UserUsageStats
+from models.database import (
+    AuditLog,
+    EnhancementJob,
+    ModelConfig,
+    User,
+    UserUsageStats,
+)
 from schemas.enhance import EnhancementJobResponse
-from services.srgan import enhance_image
+from services.image_utils import inspect_image
+from services.srgan import InferenceOOMError, enhance_image
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +33,66 @@ router = APIRouter(prefix="/enhance", tags=["enhance"])
 # Max concurrent inferences (prevents OOM on GPU/CPU)
 inference_semaphore = asyncio.Semaphore(1)
 
+_EXT_FOR_FORMAT = {"JPEG": ".jpg", "PNG": ".png"}
+_READ_CHUNK = 64 * 1024
 
-def _get_extension(filename: str | None) -> str:
-    if not filename:
-        return ".png"
-    ext = Path(filename).suffix.lower()
-    if ext not in [".jpg", ".jpeg", ".png"]:
-        return ".png"
-    return ext
+
+async def _read_limited(file: UploadFile, limit: int) -> bytes:
+    """Read an upload in chunks, aborting as soon as it exceeds `limit` bytes."""
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(_READ_CHUNK):
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds maximum size of {limit} bytes",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _record_stats(db: AsyncSession, user_id: str, *, success: bool) -> None:
+    """Update the user's usage counters, creating the row if it is missing."""
+    result = await db.execute(
+        select(UserUsageStats).where(UserUsageStats.user_id == user_id)
+    )
+    stats = result.scalar_one_or_none()
+    if stats is None:
+        stats = UserUsageStats(user_id=user_id)
+        db.add(stats)
+    stats.total_jobs = (stats.total_jobs or 0) + 1
+    if success:
+        stats.successful_jobs = (stats.successful_jobs or 0) + 1
+    else:
+        stats.failed_jobs = (stats.failed_jobs or 0) + 1
+    stats.last_job_at = datetime.now(timezone.utc)
+
+
+def _remove_files(*paths: Path | None) -> None:
+    for path in paths:
+        if path is None:
+            continue
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("Could not remove %s: %s", path, exc)
+
+
+async def _mark_failed(
+    db: AsyncSession, job_id: str, user_id: str, message: str
+) -> None:
+    """Record a failed job. Never raises: the caller is already handling an error."""
+    try:
+        await db.rollback()  # discard any half-applied changes
+        job = await db.get(EnhancementJob, job_id)
+        if job is not None:
+            job.status = "failed"
+            job.error_message = message[:500]
+        await _record_stats(db, user_id, success=False)
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not record failure for job %s", job_id)
 
 
 @router.post("", response_model=EnhancementJobResponse)
@@ -47,7 +105,6 @@ async def create_enhancement_job(
     scale: Annotated[int, Form()] = 4,
 ):
     """Upscale an uploaded low-resolution image using Real-ESRGAN."""
-    # 1 & 2. Validate file presence and format
     if not file or not file.filename:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No file attached"
@@ -59,38 +116,31 @@ async def create_enhancement_job(
             detail="Scale factor must be 2, 4, or 8.",
         )
 
-    ext = _get_extension(file.filename)
-    if ext not in [".jpg", ".jpeg", ".png"]:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file format. Only JPEG and PNG are allowed.",
-        )
-
-    # Read bytes and validate size
-    input_bytes = await file.read()
-    if len(input_bytes) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds maximum size of {settings.max_upload_bytes} bytes",
-        )
-
-    # 2.5 Decode to get dimensions
-    from services.image_utils import validate_and_decode
+    # Read with a hard cap, then validate from the header only (no pixel decode).
+    input_bytes = await _read_limited(file, settings.max_upload_bytes)
 
     try:
-        img_arr = validate_and_decode(input_bytes, settings.max_upload_bytes)
-        input_h, input_w = img_arr.shape[:2]
+        img_format, input_w, input_h = inspect_image(input_bytes)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)
+        ) from exc
+
+    if input_w * input_h > settings.max_input_pixels:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"Image is {input_w}x{input_h}; maximum is "
+                f"{settings.max_input_pixels} pixels."
+            ),
+        )
+    if input_w * input_h * scale * scale > settings.max_output_pixels:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Output at {scale}x would be too large. Try a smaller image or scale.",
         )
 
-    # 3. Create EnhancementJob row (pending)
-    job_id = str(uuid4())
-    now = datetime.now(timezone.utc)
-
-    # Needs a model_config_id for the requested scale
-    from models.database import ModelConfig
+    ext = _EXT_FOR_FORMAT[img_format]
 
     model_config_result = await db.execute(
         select(ModelConfig).where(ModelConfig.scale_factor == scale)
@@ -100,8 +150,10 @@ async def create_enhancement_job(
         logger.error("No ModelConfig found in database!")
         raise HTTPException(status_code=500, detail="Server configuration error")
 
-    user_upload_dir = Path(settings.upload_dir) / str(current_user.id)
-    input_filepath = user_upload_dir / f"{job_id}{ext}"
+    job_id = str(uuid4())
+    user_id = str(current_user.id)
+    input_filepath = Path(settings.upload_dir) / user_id / f"{job_id}{ext}"
+    result_filepath = Path(settings.results_dir) / user_id / f"{job_id}.png"
 
     job = EnhancementJob(
         id=job_id,
@@ -112,86 +164,82 @@ async def create_enhancement_job(
         input_size_bytes=len(input_bytes),
         input_width=input_w,
         input_height=input_h,
-        input_format=ext.replace(".", "").upper(),
+        input_format=img_format,
         status="pending",
         scale_factor=scale,
     )
     db.add(job)
     await db.commit()
 
-    # 4. Write input file
-    user_upload_dir = Path(settings.upload_dir) / str(current_user.id)
-    user_upload_dir.mkdir(parents=True, exist_ok=True)
-    input_filepath = user_upload_dir / f"{job_id}{ext}"
-    input_filepath.write_bytes(input_bytes)
-
-    # 5. Update job status to processing
-    job.status = "processing"
-    await db.commit()
-
-    # 6. Run enhancement (in a threadpool since it's CPU/GPU bound and blocking)
+    # Everything after the job row exists is inside one handler, so any failure
+    # (disk, inference, DB) ends with the job marked failed and files removed.
     try:
-        # Run blocking inference in a separate thread bounded by a semaphore
-        async with inference_semaphore:
-            result_bytes, metadata = await asyncio.to_thread(enhance_image, input_bytes, scale)
-    except Exception as exc:
-        logger.error("Inference failed for job %s: %s", job_id, exc)
-        job.status = "failed"
-        job.error_message = str(exc)
+        input_filepath.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(input_filepath.write_bytes, input_bytes)
 
-        # Update failed stats
-        stats_res = await db.execute(
-            select(UserUsageStats).where(UserUsageStats.user_id == current_user.id)
-        )
-        stats = stats_res.scalar_one()
-        stats.total_jobs += 1
-        stats.failed_jobs += 1
-        stats.last_job_at = datetime.now(timezone.utc)
-
+        job.status = "processing"
         await db.commit()
+
+        try:
+            await asyncio.wait_for(
+                inference_semaphore.acquire(), timeout=settings.queue_timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Server is busy. Please retry shortly.",
+                headers={"Retry-After": "30"},
+            ) from None
+        try:
+            result_bytes, metadata = await asyncio.to_thread(
+                enhance_image, input_bytes, scale
+            )
+        finally:
+            inference_semaphore.release()
+
+        result_filepath.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(result_filepath.write_bytes, result_bytes)
+
+        job.status = "completed"
+        job.input_width = metadata.get("input_width")
+        job.input_height = metadata.get("input_height")
+        job.output_width = metadata.get("output_width")
+        job.output_height = metadata.get("output_height")
+        job.output_file_path = str(result_filepath)
+        job.output_size_bytes = len(result_bytes)
+        job.processing_time_ms = metadata.get("processing_time_ms")
+        job.completed_at = datetime.now(timezone.utc)
+
+        await _record_stats(db, current_user.id, success=True)
+        db.add(
+            AuditLog(
+                user_id=current_user.id,
+                action="job.completed",
+                ip_address=request.client.host if request.client else "",
+            )
+        )
+        await db.commit()
+    except Exception as exc:
+        logger.error("Enhancement failed for job %s: %s", job_id, exc)
+        _remove_files(input_filepath, result_filepath)
+        await _mark_failed(db, job_id, current_user.id, str(exc))
+
+        if isinstance(exc, HTTPException):
+            raise
+        if isinstance(exc, InferenceOOMError):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Image too large for current server capacity.",
+            ) from exc
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Image enhancement failed due to an internal error.",
         ) from exc
 
-    # 7. Write output to results
-    user_results_dir = Path(settings.results_dir) / str(current_user.id)
-    user_results_dir.mkdir(parents=True, exist_ok=True)
-    result_filename = f"{job_id}.png"
-    result_filepath = user_results_dir / result_filename
-    result_filepath.write_bytes(result_bytes)
-
-    result_url = f"/api/results/{result_filename}"
-
-    # 8. Update job row -> completed
-    job.status = "completed"
-    job.input_width = metadata.get("input_width")
-    job.input_height = metadata.get("input_height")
-    job.output_width = metadata.get("output_width")
-    job.output_height = metadata.get("output_height")
-    job.output_file_path = str(result_filepath)
-    job.output_size_bytes = len(result_bytes)
-    job.processing_time_ms = metadata.get("processing_time_ms")
-
-    # 9. Update stats
-    stats_res = await db.execute(
-        select(UserUsageStats).where(UserUsageStats.user_id == current_user.id)
-    )
-    stats = stats_res.scalar_one()
-    stats.total_jobs += 1
-    stats.successful_jobs += 1
-    stats.last_job_at = datetime.now(timezone.utc)
-
-    # 10. Audit Log
-    db.add(AuditLog(user_id=current_user.id, action="job.completed", ip_address=""))
-
-    await db.commit()
-
-    # 11. Return response
     return EnhancementJobResponse(
         job_id=job.id,
         status=job.status,
-        result_url=result_url,
+        result_url=f"/api/results/{job_id}.png",
         input_w=job.input_width,
         input_h=job.input_height,
         output_w=job.output_width,

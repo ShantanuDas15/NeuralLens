@@ -9,6 +9,7 @@ Provides the `get_current_user` FastAPI dependency which:
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -44,7 +45,9 @@ async def get_current_user(
 
     # 2 & 3. Verify token with Firebase Admin SDK
     try:
-        decoded_token = firebase_auth.verify_id_token(token, check_revoked=True)
+        decoded_token = await asyncio.to_thread(
+            firebase_auth.verify_id_token, token, check_revoked=True
+        )
     except (InvalidIdTokenError, RevokedIdTokenError, ValueError) as exc:
         logger.warning("Firebase auth failed: %s", exc)
         raise HTTPException(
@@ -57,7 +60,9 @@ async def get_current_user(
     email = decoded_token.get("email")
 
     if not uid or not email:
-        logger.warning("Token missing uid or email: %s", decoded_token)
+        logger.warning(
+            "Token missing uid or email (claims present: %s)", sorted(decoded_token)
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token must contain uid and email.",

@@ -24,9 +24,9 @@ from services.image_utils import validate_and_decode
 @pytest.fixture(autouse=True)
 def reset_singleton():
     """Ensure the singleton is reset before each test."""
-    srgan._model_instance = None
+    srgan._model_instances.clear()
     yield
-    srgan._model_instance = None
+    srgan._model_instances.clear()
 
 
 @pytest.fixture
@@ -78,9 +78,10 @@ def sample_jpg_bytes():
 
 def test_load_model_success(mock_weights_path, mock_realesrganer):
     """Test 1: load_model() succeeds and sets the singleton."""
-    assert srgan._model_instance is None
+    assert not srgan.is_loaded()
     srgan.load_model()
-    assert srgan._model_instance is not None
+    assert srgan.is_loaded()
+    assert {2, 4, 8} <= set(srgan._model_instances)
 
 
 def test_enhance_image_raises_if_not_loaded(sample_png_bytes):

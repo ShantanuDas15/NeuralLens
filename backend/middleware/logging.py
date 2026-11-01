@@ -1,10 +1,13 @@
-"""Structured logging middleware."""
+"""Structured request logging middleware."""
 
+import time
 import uuid
 
 import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+
+log = structlog.get_logger("access")
 
 
 class StructlogMiddleware(BaseHTTPMiddleware):
@@ -19,8 +22,22 @@ class StructlogMiddleware(BaseHTTPMiddleware):
             client_ip=request.client.host if request.client else None,
         )
 
-        response = await call_next(request)
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            log.error(
+                "request failed",
+                duration_ms=int((time.perf_counter() - start) * 1000),
+                exc_info=True,
+            )
+            raise
 
-        # We can add a custom header to the response to trace it back
+        log.info(
+            "request completed",
+            status=response.status_code,
+            duration_ms=int((time.perf_counter() - start) * 1000),
+        )
         response.headers["X-Request-ID"] = req_id
+        structlog.contextvars.clear_contextvars()
         return response

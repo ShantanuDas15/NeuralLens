@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     results_dir: str = "results"
     max_upload_bytes: int = 2_097_152  # 2 MB
 
+    # Inference limits (protect memory: a 2 MB file can decode to a huge image)
+    max_input_pixels: int = 4_000_000  # ~2000x2000
+    max_output_pixels: int = 50_000_000  # input pixels * scale^2
+    tile_size: int = 400  # 0 disables tiling (whole image in one pass)
+    queue_timeout_seconds: float = 60.0  # max wait for the single inference slot
+
     # CORS
     allowed_origins: list[str] = ["http://localhost:5173"]
 

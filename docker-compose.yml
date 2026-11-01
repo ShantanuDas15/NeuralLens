@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build:
@@ -11,7 +9,8 @@ services:
       - ./backend/.env
     environment:
       # Override the DB URL for Docker network
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/neurallens
+      - FIREBASE_SERVICE_ACCOUNT_PATH=/app/serviceAccountKey.json
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/neurallens
     depends_on:
       db:
         condition: service_healthy
@@ -19,17 +18,17 @@ services:
       - ./backend/uploads:/app/uploads
       - ./backend/results:/app/results
       - ./backend/weights:/app/weights
-      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
 
   db:
     image: postgres:15-alpine
     container_name: neurallens-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: neurallens
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
