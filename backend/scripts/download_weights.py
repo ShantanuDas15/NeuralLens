@@ -25,7 +25,7 @@ WEIGHTS = {
     "RealESRGAN_x2plus.pth": (
         f"{BASE}/v0.2.1/RealESRGAN_x2plus.pth",
         67061725,
-        "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266ab",
+        "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb",
     ),
 }
 

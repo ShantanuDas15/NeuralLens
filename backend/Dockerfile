@@ -19,6 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install dependencies
 COPY requirements.txt .
 # We use --no-build-isolation to prevent memory errors building torchvision/basicsr
+#
+# basicsr's setup.py needs torch/numpy/Cython already installed at build time,
+# but requirements.txt is alphabetical (basicsr comes before torch). Install the
+# build prerequisites first, using the pins from requirements.txt, so basicsr
+# does not try to fetch them itself (which is slow and fails).
+RUN grep -E '^(--extra-index-url|torch==|torchvision==|numpy==|Cython==)' requirements.txt > build-prereqs.txt \
+    && pip install --no-cache-dir -r build-prereqs.txt \
+    && rm build-prereqs.txt
 RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
 
 # Copy the backend code
