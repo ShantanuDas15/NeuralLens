@@ -10,19 +10,33 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from firebase_admin import auth as firebase_auth
 from firebase_admin.auth import InvalidIdTokenError, RevokedIdTokenError
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import get_db
 from models.database import AuditLog, User, UserUsageStats
 
 logger = logging.getLogger(__name__)
+
+# A session counts as a new "login" (one audit row, one last_login_at write)
+# only after this much quiet. Every API call is token-authenticated, so
+# recording each one would write to the DB on every request, thumbnails included.
+LOGIN_REFRESH_INTERVAL = timedelta(hours=1)
+
+
+def _is_stale(last_login_at: datetime | None, now: datetime) -> bool:
+    if last_login_at is None:
+        return True
+    if last_login_at.tzinfo is None:  # SQLite returns naive datetimes
+        last_login_at = last_login_at.replace(tzinfo=timezone.utc)
+    return now - last_login_at >= LOGIN_REFRESH_INTERVAL
 
 
 async def get_current_user(
@@ -77,10 +91,12 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     is_first_login = False
+    record_login = False
 
     if user is None:
-        # Create new user
-        is_first_login = True
+        # The SPA fires several requests at once on first sign-in, so two of
+        # them can reach this insert together. The unique constraint makes one
+        # lose; the savepoint lets it recover and use the winner's row.
         user = User(
             firebase_uid=uid,
             email=email,
@@ -88,29 +104,40 @@ async def get_current_user(
             photo_url=photo_url,
             last_login_at=now,
         )
-        db.add(user)
-        # Flush to generate user.id before referencing it in other tables
-        await db.flush()
+        try:
+            async with db.begin_nested():
+                db.add(user)
+                # Flush to generate user.id before referencing it elsewhere
+                await db.flush()
+            is_first_login = True
+            record_login = True
+        except IntegrityError:
+            result = await db.execute(select(User).where(User.firebase_uid == uid))
+            user = result.scalar_one_or_none()
+            if user is None:
+                # Same email, different Firebase account.
+                logger.warning("Email already linked to another account")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this email already exists.",
+                ) from None
     else:
-        # Update existing user
         user.email = email
         if display_name:
             user.display_name = display_name
         if photo_url:
             user.photo_url = photo_url
-        user.last_login_at = now
+        if _is_stale(user.last_login_at, now):
+            user.last_login_at = now
+            record_login = True
 
-    # 6. Upsert user_usage_stats (if first login)
+    # 6. Initialise usage stats (first login only)
     if is_first_login:
-        stats = UserUsageStats(user_id=user.id)
-        db.add(stats)
+        db.add(UserUsageStats(user_id=user.id))
 
-    # 7. Insert AuditLog
-    audit_log = AuditLog(
-        user_id=user.id,
-        action="user.login",
-    )
-    db.add(audit_log)
+    # 7. Audit log (first login, or a fresh session after a quiet period)
+    if record_login:
+        db.add(AuditLog(user_id=user.id, action="user.login"))
 
     # The session is committed automatically by the `get_db` dependency's yield block
     # so we just return the user object here.

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     tile_size: int = 400  # 0 disables tiling (whole image in one pass)
     queue_timeout_seconds: float = 60.0  # max wait for the single inference slot
 
+    # Per-IP limit on every route (the enhance route has its own, stricter one).
+    # Empty string disables it. Format: "120/minute".
+    default_rate_limit: str = "120/minute"
+
     # CORS
     allowed_origins: list[str] = ["http://localhost:5173"]
 

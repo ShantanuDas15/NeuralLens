@@ -149,7 +149,16 @@ def test_health_no_auth_required(test_client):
 # ---------------------------------------------------------------------------
 
 
-def test_docs_accessible(test_client):
-    """Swagger UI (/docs) returns HTTP 200."""
-    response = test_client.get("/docs")
+def test_docs_hidden_by_default(test_client):
+    """API docs and the OpenAPI schema are not exposed outside debug mode."""
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert test_client.get(path).status_code == 404
+
+
+def test_docs_available_in_debug(monkeypatch):
+    """With DEBUG on, Swagger UI (/docs) returns HTTP 200."""
+    import main
+
+    monkeypatch.setattr(main.settings, "debug", True)
+    response = TestClient(main.create_app()).get("/docs")
     assert response.status_code == 200

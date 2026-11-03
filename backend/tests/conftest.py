@@ -12,3 +12,4 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ.setdefault("FIREBASE_PROJECT_ID", "test-project")
 os.environ.setdefault("FIREBASE_SERVICE_ACCOUNT_PATH", "unused.json")
+os.environ.setdefault("DEFAULT_RATE_LIMIT", "")  # suite shares one client IP

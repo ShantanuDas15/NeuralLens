@@ -7,12 +7,16 @@ import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from middleware.limits import sanitize_request_id
+
 log = structlog.get_logger("access")
 
 
 class StructlogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        req_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        req_id = sanitize_request_id(
+            request.headers.get("X-Request-ID"), str(uuid.uuid4())
+        )
 
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(

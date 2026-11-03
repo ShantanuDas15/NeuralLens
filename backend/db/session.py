@@ -46,8 +46,11 @@ def _make_engine():
 
             kwargs["poolclass"] = StaticPool
     elif "postgresql" in settings.database_url:
-        kwargs["pool_size"] = 10
-        kwargs["max_overflow"] = 20
+        # One worker process: a small pool is plenty and keeps well under the
+        # Postgres connection limit. pre_ping drops connections the server closed.
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 5
+        kwargs["pool_pre_ping"] = True
 
     kwargs["connect_args"] = connect_args
 

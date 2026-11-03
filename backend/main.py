@@ -20,8 +20,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from config import settings
+from middleware.limits import (
+    MULTIPART_OVERHEAD,
+    BodySizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from middleware.rate_limit import limiter
 
 # ---------------------------------------------------------------------------
@@ -161,8 +167,10 @@ def create_app() -> FastAPI:
         title="NeuralLens API",
         description="AI-Powered Image Super-Resolution — Backend API",
         version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        # Interactive API docs only in debug; they expose the full surface.
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
         lifespan=lifespan,
     )
 
@@ -176,8 +184,14 @@ def create_app() -> FastAPI:
             status_code=500, content={"detail": "Internal Server Error"}
         )
 
-    # Middleware (Order matters: outermost first)
+    # Middleware: the LAST one added is the outermost.
+    # Innermost, so an oversized body is rejected as an ordinary logged 413.
+    application.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_upload_bytes + MULTIPART_OVERHEAD,
+    )
     application.add_middleware(StructlogMiddleware)
+    application.add_middleware(SlowAPIMiddleware)  # applies the default limit
 
     # CORS
     application.add_middleware(
@@ -186,6 +200,12 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+    # Outermost, so every response (including CORS and 413s) carries the headers.
+    # The strict CSP would break the Swagger UI, so it is off in debug.
+    application.add_middleware(
+        SecurityHeadersMiddleware, strict_csp=not settings.debug
     )
 
     # Routers (registered once the modules exist — stubs registered now)
@@ -223,6 +243,7 @@ app: FastAPI = create_app()
 # Health check — unauthenticated, always available
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["health"], summary="Liveness check")
+@limiter.exempt
 async def health_check() -> dict[str, str]:
     """Return a simple liveness confirmation.
 
@@ -236,6 +257,7 @@ async def health_check() -> dict[str, str]:
 # Readiness check — verifies DB, model and Firebase; returns 503 otherwise
 # ---------------------------------------------------------------------------
 @app.get("/ready", tags=["health"], summary="Readiness check")
+@limiter.exempt
 async def readiness_check() -> JSONResponse:
     """Report whether the service can actually serve enhancement requests."""
     from sqlalchemy import text  # noqa: PLC0415
