@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./neurallens.db"
+    # Fail startup if DATABASE_URL is SQLite (set true in production).
+    require_postgres: bool = False
 
     # Fail startup (instead of only warning) if model weights are missing.
     require_model: bool = False
@@ -59,6 +61,19 @@ class Settings(BaseSettings):
             if v.startswith(prefix):
                 return "postgresql+asyncpg://" + v[len(prefix):]
         return v
+
+    @model_validator(mode="after")
+    def _require_postgres_in_production(self) -> "Settings":
+        """Refuse to boot on SQLite when REQUIRE_POSTGRES is set.
+
+        SQLite lives on the container's ephemeral disk on Railway, so a
+        mis-wired DATABASE_URL would silently lose all data on restart.
+        """
+        if self.require_postgres and "sqlite" in self.database_url:
+            raise ValueError(
+                "REQUIRE_POSTGRES is set but DATABASE_URL points at SQLite."
+            )
+        return self
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

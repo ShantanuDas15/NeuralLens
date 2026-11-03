@@ -37,6 +37,30 @@ def test_sqlite_url_untouched():
     assert Settings(firebase_project_id="x", database_url=url).database_url == url
 
 
+def test_require_postgres_rejects_sqlite():
+    from pydantic import ValidationError
+
+    from config import Settings
+
+    with pytest.raises(ValidationError, match="REQUIRE_POSTGRES"):
+        Settings(
+            firebase_project_id="x",
+            database_url="sqlite+aiosqlite:///./x.db",
+            require_postgres=True,
+        )
+
+
+def test_require_postgres_accepts_postgres():
+    from config import Settings
+
+    s = Settings(
+        firebase_project_id="x",
+        database_url="postgres://u:p@h:5432/d",
+        require_postgres=True,
+    )
+    assert s.database_url.startswith("postgresql+asyncpg://")
+
+
 def test_ready_503_when_model_missing(monkeypatch):
     import services.srgan as srgan
     from main import app
