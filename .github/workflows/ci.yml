@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # weekly: new advisories appear without any push
 
 permissions:
   contents: read
@@ -31,7 +33,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       # opencv-python (non-headless) needs these shared libraries at import.
       - name: System libraries
@@ -46,7 +50,7 @@ jobs:
           rm build-prereqs.txt
 
       - name: Install dependencies
-        run: pip install --no-build-isolation -r requirements.txt
+        run: pip install --no-build-isolation -r requirements-dev.txt
 
       - name: Run tests
         run: python -m pytest -q
@@ -55,9 +59,6 @@ jobs:
     name: Backend dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Informational until the first findings are triaged; remove
-    # continue-on-error to make it a gate.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,7 +67,12 @@ jobs:
       - name: pip-audit
         run: |
           pip install pip-audit
-          pip-audit -r backend/requirements.txt --no-deps --disable-pip
+          # torch/torchvision "+cpu" builds are not on PyPI, so they cannot be audited.
+          grep -v -E '^(torch|torchvision)==|^--extra-index-url' backend/requirements.txt > /tmp/req-audit.txt
+          # PYSEC-2026-1215 (basicsr, CVE-2024-27763): needs an attacker-controlled
+          # SLURM_NODELIST environment variable; that code path is unused and
+          # upstream has no fix. Re-evaluate if basicsr is upgraded or replaced.
+          pip-audit -r /tmp/req-audit.txt --no-deps --disable-pip --ignore-vuln PYSEC-2026-1215
 
   frontend:
     name: Frontend lint, build, audit
