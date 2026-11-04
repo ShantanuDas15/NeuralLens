@@ -1,21 +1,33 @@
+/*
+ * The primary action on the auth screens: solid white with the Google mark,
+ * on both themes (Google's guidelines call for a light button).
+ */
 .google-sign-in-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.75rem;
   width: 100%;
-  padding: 0.75rem 1rem;
+  height: 50px;
+  padding: 0 1rem;
   background-color: #ffffff;
-  color: #3c4043;
+  color: #18181b;
   border: 1px solid #dadce0;
-  border-radius: var(--radius-sm);
-  font-size: 1rem;
-  font-weight: 500;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .google-sign-in-btn:hover:not(:disabled) {
-  background-color: #f8f9fa;
+  background-color: #f4f4f5;
   box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+.google-sign-in-btn:focus-visible {
+  outline: 3px solid #a78bfa;
+  outline-offset: 3px;
 }
 
 .google-sign-in-btn:disabled {
@@ -26,5 +38,4 @@
 .google-icon {
   width: 1.25rem;
   height: 1.25rem;
-  margin-right: 0.75rem;
 }

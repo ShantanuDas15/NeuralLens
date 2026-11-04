@@ -1,0 +1,124 @@
+.ba {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(124, 58, 237, 0.25);
+  background: #18181b;
+}
+
+.ba-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.ba-img-after {
+  clip-path: inset(0 0 0 var(--pos));
+}
+
+.ba-tag {
+  position: absolute;
+  top: 14px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  /* Near-opaque so the label text stays readable over any photo. */
+  background: rgba(9, 9, 11, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fafafa;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+.ba-tag-before {
+  left: 14px;
+}
+
+.ba-tag-after {
+  right: 14px;
+  border-color: rgba(167, 139, 250, 0.55);
+  color: #ede9fe;
+}
+
+.ba-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+
+.ba-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.ba-knob {
+  position: absolute;
+  top: 50%;
+  left: var(--pos);
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #18181b;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* The range input is invisible, so show focus on the knob instead. */
+.ba-range:focus-visible ~ .ba-knob {
+  outline: 3px solid #a78bfa;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  /* Two long chips collide on a phone-width image: keep just the names. */
+  .ba-meta {
+    display: none;
+  }
+
+  .ba {
+    border-radius: 16px;
+  }
+
+  .ba-tag {
+    top: 10px;
+    padding: 5px 10px;
+    font-size: 0.72rem;
+  }
+
+  .ba-tag-before {
+    left: 10px;
+  }
+
+  .ba-tag-after {
+    right: 10px;
+  }
+
+  .ba-knob {
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+  }
+}
