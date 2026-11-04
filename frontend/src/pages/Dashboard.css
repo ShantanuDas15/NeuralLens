@@ -1,11 +1,13 @@
 .dashboard-container {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.75rem;
   width: 100%;
-  height: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
+/* Header shown while an image is being processed or compared. */
 .dashboard-header {
   text-align: center;
   max-width: 800px;
@@ -20,16 +22,14 @@
   letter-spacing: -0.025em;
 }
 
-.dashboard-subtitle {
-  color: var(--color-text-secondary);
-  font-size: 1.05rem;
-  line-height: 1.5;
-}
-
 .dashboard-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+}
+
+.home-stack {
   width: 100%;
 }

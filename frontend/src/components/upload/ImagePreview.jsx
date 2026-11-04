@@ -3,8 +3,8 @@ import Button from '../ui/Button';
 import { Sparkles, X } from 'lucide-react';
 import './ImagePreview.css';
 
-const ImagePreview = ({ originalUrl, file, onEnhance, onCancel }) => {
-  const [scale, setScale] = useState(4);
+const ImagePreview = ({ originalUrl, file, onEnhance, onCancel, initialScale = 4 }) => {
+  const [scale, setScale] = useState(initialScale);
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 Bytes';

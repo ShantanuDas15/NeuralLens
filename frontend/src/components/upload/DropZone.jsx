@@ -1,16 +1,23 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { UploadCloud, Image as ImageIcon, X } from 'lucide-react';
+import { UploadCloud, X } from 'lucide-react';
 import Button from '../ui/Button';
 import './DropZone.css';
 
 const MAX_FILES = 5;
 const MAX_SIZE = 2 * 1024 * 1024;
+// The backend only decodes JPEG and PNG (services/image_utils.py), so accepting
+// anything else here would just fail after the upload.
+const VALID_TYPES = ['image/jpeg', 'image/png'];
 
-const DropZone = ({ onFilesSelected, multiple = true }) => {
+/**
+ * variant "hero": the large centrepiece (returning users).
+ * variant "compact": a one-row strip under the samples (first visit).
+ * The upscale factor is owned by the dashboard so samples and uploads share it.
+ */
+const DropZone = ({ onFilesSelected, scale, variant = 'hero', multiple = true }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [error, setError] = useState('');
-  const [scale, setScale] = useState(4);
   const inputRef = useRef(null);
 
   const previewUrls = useMemo(() => {
@@ -25,7 +32,6 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
 
   const validateFiles = (files) => {
     setError('');
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const validFiles = [];
 
     if (files.length > MAX_FILES) {
@@ -34,8 +40,8 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
     }
 
     for (const file of files) {
-      if (!validTypes.includes(file.type)) {
-        setError('Please upload only valid image files (JPEG, PNG, WEBP).');
+      if (!VALID_TYPES.includes(file.type)) {
+        setError('Please upload only JPEG or PNG images.');
         return [];
       }
       if (file.size > MAX_SIZE) {
@@ -97,15 +103,22 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
     if (inputRef.current) inputRef.current.value = '';
   };
 
+  const browse = (e) => {
+    e.stopPropagation(); // the area also opens the picker on click
+    inputRef.current?.click();
+  };
+
   const handleUpload = () => {
     if (selectedFiles.length > 0) {
       onFilesSelected(selectedFiles, scale);
     }
   };
 
+  const limits = `JPEG or PNG · up to 2 MB each · up to ${MAX_FILES} at once`;
+
   return (
-    <div className="dropzone-container">
-      <div 
+    <div className={`dropzone-container dz-${variant}`}>
+      <div
         className={`dropzone-area ${dragActive ? 'drag-active' : ''} ${selectedFiles.length > 0 ? 'has-file' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -113,13 +126,14 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
         onDrop={handleDrop}
         onClick={() => selectedFiles.length === 0 && inputRef.current?.click()}
       >
-        <input 
+        <input
           ref={inputRef}
-          type="file" 
-          accept="image/jpeg, image/png, image/webp" 
-          onChange={handleChange} 
+          type="file"
+          accept="image/jpeg, image/png"
+          onChange={handleChange}
           className="dropzone-input"
           multiple={multiple}
+          tabIndex={-1}
         />
 
         {selectedFiles.length > 0 ? (
@@ -127,9 +141,9 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
             <div className="preview-grid">
               {selectedFiles.map((file, idx) => (
                 <div key={idx} className="preview-image-container">
-                  <img 
-                    src={previewUrls[idx]} 
-                    alt={`Preview ${idx + 1}`} 
+                  <img
+                    src={previewUrls[idx]}
+                    alt={`Preview ${idx + 1}`}
                     className="preview-image"
                   />
                   <button className="clear-btn" onClick={(e) => removeFile(e, idx)} aria-label="Remove image">
@@ -147,49 +161,46 @@ const DropZone = ({ onFilesSelected, multiple = true }) => {
                </button>
             )}
           </div>
+        ) : variant === 'compact' ? (
+          <div className="dz-row">
+            <UploadCloud size={26} aria-hidden="true" className="dz-row-icon" />
+            <div className="dz-row-text">
+              <strong>Or drop your own photo here</strong>
+              <span>{limits}</span>
+            </div>
+            <Button variant="secondary" type="button" onClick={browse}>Browse files</Button>
+          </div>
         ) : (
           <div className="dropzone-prompt">
-            <div className="dropzone-icon-wrapper">
-              <UploadCloud size={48} />
-            </div>
-            <h3>Drop your image{multiple ? 's' : ''} here</h3>
-            <p>or click to browse from your device</p>
-            <div className="dropzone-limits">
-              Supports JPEG, PNG, WEBP (Max 2MB per file, up to {MAX_FILES} files)
-            </div>
+            <div className="dz-ring"><UploadCloud size={34} aria-hidden="true" /></div>
+            <h3>Drop image{multiple ? 's' : ''} here</h3>
+            <p>or choose {multiple ? 'them' : 'it'} from your device</p>
+            <Button variant="primary" type="button" onClick={browse}>Browse files</Button>
+            <ul className="dz-chips">
+              <li>JPEG or PNG</li>
+              <li>Up to 2 MB each</li>
+              <li>Up to {MAX_FILES} at once</li>
+            </ul>
           </div>
         )}
       </div>
 
-      {error && <div className="dropzone-error">{error}</div>}
+      {error && <div className="dropzone-error" role="alert">{error}</div>}
 
-      <div className="dropzone-actions">
-        {selectedFiles.length > 1 && (
-          <div className="batch-scale-picker">
-            <span className="scale-label">Scale:</span>
-            <div className="scale-toggle-group">
-              {[2, 4].map((s) => (
-                <button
-                  key={s}
-                  className={`scale-btn ${scale === s ? 'active' : ''}`}
-                  onClick={() => setScale(s)}
-                >
-                  {s}×
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        <Button 
-          variant="primary" 
-          size="lg" 
-          disabled={selectedFiles.length === 0}
-          onClick={handleUpload}
-          className="upload-submit-btn"
-        >
-          {selectedFiles.length > 1 ? `Enhance ${selectedFiles.length} Images` : 'Enhance Image'}
-        </Button>
-      </div>
+      {selectedFiles.length > 0 && (
+        <div className="dropzone-actions">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleUpload}
+            className="upload-submit-btn"
+          >
+            {selectedFiles.length > 1
+              ? `Enhance ${selectedFiles.length} Images`
+              : `Enhance Image ${scale}×`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
