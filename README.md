@@ -10,7 +10,9 @@ Full-stack AI image super-resolution: upload a low-resolution photo and get a 2x
 [![CI](https://github.com/ShantanuDas15/NeuralLens/actions/workflows/ci.yml/badge.svg)](https://github.com/ShantanuDas15/NeuralLens/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**Live demo:** [app.shantanudas.dev](https://app.shantanudas.dev)
+[![Live demo](https://img.shields.io/badge/Live%20demo-app.shantanudas.dev-7c3aed?logo=railway&logoColor=white)](https://app.shantanudas.dev)
+
+**Try it now: [app.shantanudas.dev](https://app.shantanudas.dev)**. Sign in with Google or email, then pick a built-in sample to run the real model without uploading anything.
 
 ![NeuralLens dashboard](docs/screenshots/dashboard.png)
 
